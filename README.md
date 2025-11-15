@@ -10,7 +10,8 @@
 
 Esta es nuestra guía de trabajo, ordenada por prioridad. Marcamos una casilla cuando la funcionalidad esté terminada y subida a Git.
 
-### Hito 1: Configuración de Escena y Cámara
+### Hito 1: Setup Inicial y Assets
+* [ ] **Diseño del Bloque:** Crear/Descargar el modelo 3D del bloque (jugador) y los tiles básicos (suelo, meta, botón, etc.).
 * [ ] **Cámara Ortográfica:** Configurar la `Main Camera` como Ortográfica en el Inspector.
 * [ ] **Crear Escenas:** Crear las 3 escenas (`Menu`, `Level_1`, `Credits`).
 * [ ] **Navegación:** Script simple para que los botones del Menú carguen las escenas `Level_1` y `Credits`.
@@ -55,3 +56,18 @@ Esta es nuestra guía de trabajo, ordenada por prioridad. Marcamos una casilla c
 * [ ] **Generar Build (`Binari`):** Crear el ejecutable del juego.
 * [ ] **Grabar `demo.avi`:** Grabar un vídeo demo de 1 minuto (y comprimirlo).
 * [ ] **Limpiar Proyecto:** Eliminar la carpeta `Library` y assets no usados antes de comprimir.
+
+---
+
+## 🛠️ Recursos Útiles (Links del PDF)
+
+### Para ENCONTRAR Assets 3D
+* [TurboSquid](http://www.turbosquid.com/)
+* [Free3D](https://free3d.com/)
+* [Unity Asset Store](http://www.assetstore.unity3d.com)
+* [BlenderKit](https://www.blenderkit.com/)
+
+### Para CREAR Assets 3D
+* **Vóxels:** [MagicaVoxel](https://ephtracy.github.io/)
+* **Modelado 3D:** [Blockbench](https://www.blockbench.net/)
+* **Modelado 3D (Avanzado):** [Blender](https://www.blender.org/)
