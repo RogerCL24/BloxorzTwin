@@ -149,7 +149,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapCreation
   map: {fileID: 4900000, guid: 28cf6d1fb1568cb4bb508f4e3e9d31dc, type: 3}
-  tile: {fileID: 7761140359684795549, guid: f8fd0d93878f1644ba84fc95bbf549c7, type: 3}
+  tile: {fileID: 7761140359684795549, guid: 9c331d28d21160f4fbe136ed475a578b, type: 3}
 --- !u!4 &335594040
 Transform:
   m_ObjectHideFlags: 0
