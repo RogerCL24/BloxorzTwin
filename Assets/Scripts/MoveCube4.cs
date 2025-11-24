@@ -1,131 +1,239 @@
+using System.Collections;
 using System;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-
-// MoveCube manages cube movement. WASD + Cursor keys rotate the cube in the
-// selected direction. If the cube is not grounded (has a tile under it), it falls.
-// Some events trigger corresponding sounds.
-
-
+// Movement logic for a 1x2x1 block similar to Bloxorz.
+// States: Standing (vertical), LyingX (length along X), LyingZ (length along Z).
+// Rotations are animated around the bottom edge in the direction of movement
+// and final positions are snapped to the tile grid to ensure correct alignment.
 public class MoveCube : MonoBehaviour
 {
-    InputAction moveAction; 		// Input action to capture player movement (WASD + cursor keys)
+    InputAction moveAction;
 
-    bool bMoving = false; 			// Is the object in the middle of moving?
-	bool bFalling = false; 			// Is the object falling?
-    
-	public float rotSpeed; 			// Rotation speed in degrees per second
-    public float fallSpeed; 		// Fall speed in the Y direction
+    public float rotSpeed = 360f;    // degrees per second for rotation animations
+    public float fallSpeed = 5f;
 
-    Vector3 rotPoint, rotAxis; 		// Rotation movement is performed around the line formed by rotPoint and rotAxis
-	float rotRemainder; 			// The angle that the cube still has to rotate before the current movement is completed
-    float rotDir; 					// Has rotRemainder to be applied in the positive or negative direction?
-    LayerMask layerMask; 			// LayerMask to detect raycast hits with ground tiles only
+    public AudioClip[] sounds;
+    public AudioClip fallSound;
 
-    public AudioClip[] sounds; 		// Sounds to play when the cube rotates
-    public AudioClip fallSound; 	// Sound to play when the cube starts falling
-	
-	
-	// Determine if the cube is grounded by shooting a ray down from the cube location and 
-	// looking for hits with ground tiles
+    // Alignment offset to tweak visual mesh position relative to logical grid (adjust in Inspector)
+    public Vector3 alignmentOffset = Vector3.zero;
 
-    bool isGrounded()
-    {
-        RaycastHit hit;
-        if (Physics.Raycast(transform.position, Vector3.down, out hit, 1.0f, layerMask))
-            return true;
+    const float tile = 1f;
 
-        return false;
-    }
+    enum Orientation { Standing, LyingX, LyingZ }
+    Orientation orientation = Orientation.Standing;
 
-    // Start is called once after the MonoBehaviour is created
+    bool isMoving = false;
+    bool isFalling = false;
+
+    LayerMask groundMask;
+
     void Start()
     {
-		// Find the move action by name. Done once in the Start method to avoid doing it every Update call.
         moveAction = InputSystem.actions.FindAction("Move");
-		
-		// Create the layer mask for ground tiles. Done once in the Start method to avoid doing it every Update call.
-        layerMask = LayerMask.GetMask("Ground");
+        groundMask = LayerMask.GetMask("Ground");
+
+        // Guess initial orientation from scale (optional)
+        float sx = transform.localScale.x;
+        float sy = transform.localScale.y;
+        float sz = transform.localScale.z;
+        if (sy > sx + 0.5f && sy > sz + 0.5f) orientation = Orientation.Standing;
+        else if (sx > sz) orientation = Orientation.LyingX;
+        else orientation = Orientation.LyingZ;
     }
 
-    // Update is called once per frame
     void Update()
     {
-        if(bFalling)
+        if (isFalling)
         {
-			// If we have fallen, we just move down
             transform.Translate(Vector3.down * fallSpeed * Time.deltaTime, Space.World);
+            return;
         }
-        else if (bMoving)
+
+        if (isMoving) return;
+
+        if (!IsGrounded())
         {
-			// If we are moving, we rotate around the line formed by rotPoint and rotAxis an angle depending on deltaTime
-			// If this angle is larger than the remainder, we stop the movement
-            float amount = rotSpeed * Time.deltaTime;
-            if(amount > rotRemainder)
+            StartFall();
+            return;
+        }
+
+        Vector2 input = moveAction.ReadValue<Vector2>();
+        if (Math.Abs(input.x) > 0.99f)
+        {
+            Vector3 dir = input.x > 0 ? Vector3.right : Vector3.left;
+            StartCoroutine(MoveStep(dir));
+        }
+        else if (Math.Abs(input.y) > 0.99f)
+        {
+            Vector3 dir = input.y > 0 ? Vector3.forward : Vector3.back;
+            StartCoroutine(MoveStep(dir));
+        }
+    }
+
+    void StartFall()
+    {
+        isFalling = true;
+        if (fallSound != null) AudioSource.PlayClipAtPoint(fallSound, transform.position, 1.5f);
+    }
+
+    bool IsGrounded()
+    {
+        RaycastHit hit;
+        if (orientation == Orientation.Standing)
+        {
+            float dist = 1f + 0.05f; // center at y=1 for height 2
+            return Physics.Raycast(transform.position, Vector3.down, out hit, dist, groundMask);
+        }
+        else if (orientation == Orientation.LyingX)
+        {
+            float dist = 0.5f + 0.05f;
+            Vector3 a = transform.position + Vector3.right * 0.5f;
+            Vector3 b = transform.position + Vector3.left * 0.5f;
+            bool ha = Physics.Raycast(a, Vector3.down, out hit, dist, groundMask);
+            bool hb = Physics.Raycast(b, Vector3.down, out hit, dist, groundMask);
+            return ha || hb;
+        }
+        else // LyingZ
+        {
+            float dist = 0.5f + 0.05f;
+            Vector3 a = transform.position + Vector3.forward * 0.5f;
+            Vector3 b = transform.position + Vector3.back * 0.5f;
+            RaycastHit tmp;
+            bool ha = Physics.Raycast(a, Vector3.down, out tmp, dist, groundMask);
+            bool hb = Physics.Raycast(b, Vector3.down, out tmp, dist, groundMask);
+            return ha || hb;
+        }
+    }
+
+    int RoundToTile(float v)
+    {
+        return Mathf.RoundToInt(v);
+    }
+
+    IEnumerator MoveStep(Vector3 dir)
+    {
+        isMoving = true;
+
+        if (sounds != null && sounds.Length > 0)
+        {
+            int i = UnityEngine.Random.Range(0, sounds.Length);
+            AudioSource.PlayClipAtPoint(sounds[i], transform.position, 1.0f);
+        }
+
+        Vector3 startPos = transform.position;
+        Quaternion startRot = transform.rotation;
+
+        Vector3 finalPos = startPos;
+        Quaternion finalRot = startRot;
+
+        Vector3 pivot = Vector3.zero;
+        Vector3 axis = Vector3.zero;
+
+        // Compute final positions by grid logic to ensure exact tile alignment
+        if (orientation == Orientation.Standing)
+        {
+            int tileX = RoundToTile(startPos.x);
+            int tileZ = RoundToTile(startPos.z);
+
+            if (Mathf.Abs(dir.x) > 0.5f)
             {
-                transform.RotateAround(rotPoint, rotAxis, rotRemainder * rotDir);
-                bMoving = false;
+                // tip over to lie along X
+                finalPos = new Vector3(tileX + (dir.x > 0 ? 0.5f : -0.5f), 0.5f, tileZ);
+                pivot = startPos + new Vector3(dir.x * 0.5f, -1f, 0f);
+                axis = Vector3.forward * (dir.x > 0 ? -1f : 1f);
+                orientation = Orientation.LyingX;
             }
             else
             {
-                transform.RotateAround(rotPoint, rotAxis, amount * rotDir);
-                rotRemainder -= amount;
+                // tip over to lie along Z
+                finalPos = new Vector3(tileX, 0.5f, tileZ + (dir.z > 0 ? 0.5f : -0.5f));
+                pivot = startPos + new Vector3(0f, -1f, dir.z * 0.5f);
+                axis = Vector3.right * (dir.z > 0 ? 1f : -1f);
+                orientation = Orientation.LyingZ;
             }
         }
-        else
+        else if (orientation == Orientation.LyingX)
         {
-			// If we are not falling, nor moving, we check first if we should fall, then if we have to move
-            if (!isGrounded())
+            // center.x is k+0.5
+            int minTileX = Mathf.RoundToInt(startPos.x - 0.5f); // left tile index
+            int tileZ = RoundToTile(startPos.z);
+
+            if (Mathf.Abs(dir.x) > 0.5f)
             {
-                bFalling = true;
-				
-				// Play sound associated to falling
-                AudioSource.PlayClipAtPoint(fallSound, transform.position, 1.5f);
+                // roll to standing on one of the two tiles
+                int newTileX = dir.x > 0 ? (minTileX + 1) : minTileX;
+                finalPos = new Vector3(newTileX, 1f, tileZ);
+                pivot = startPos + new Vector3(dir.x * 1f, -0.5f, 0f);
+                axis = Vector3.forward * (dir.x > 0 ? -1f : 1f);
+                orientation = Orientation.Standing;
             }
-			
-			// Read the move action for input
-            Vector2 dir = moveAction.ReadValue<Vector2>();
-            if(Math.Abs(dir.x) > 0.99 || Math.Abs(dir.y) > 0.99)
+            else
             {
-				// If the absolute value of one of the axis is larger than 0.99, the player wants to move in a non diagonal direction
-                bMoving = true;
-				
-				// We play a random movemnt sound
-                int iSound = UnityEngine.Random.Range(0, sounds.Length);
-                AudioSource.PlayClipAtPoint(sounds[iSound], transform.position, 1.0f);
-				
-				// Set rotDir, rotRemainder, rotPoint, and rotAxis according to the movement the player wants to make
-                if (dir.x > 0.99)
-                {
-                    rotDir = -1.0f;
-                    rotRemainder = 90.0f;
-                    rotAxis = new Vector3(0.0f, 0.0f, 1.0f);
-                    rotPoint = transform.position + new Vector3(0.5f, -0.5f, 0.0f);
-                }
-                else if (dir.x < -0.99)
-                {
-                    rotDir = 1.0f;
-                    rotRemainder = 90.0f;
-                    rotAxis = new Vector3(0.0f, 0.0f, 1.0f);
-                    rotPoint = transform.position + new Vector3(-0.5f, -0.5f, 0.0f);
-                }
-                else if (dir.y > 0.99)
-                {
-                    rotDir = 1.0f;
-                    rotRemainder = 90.0f;
-                    rotAxis = new Vector3(1.0f, 0.0f, 0.0f);
-                    rotPoint = transform.position + new Vector3(0.0f, -0.5f, 0.5f);
-                }
-                else if (dir.y < -0.99)
-                {
-                    rotDir = -1.0f;
-                    rotRemainder = 90.0f;
-                    rotAxis = new Vector3(1.0f, 0.0f, 0.0f);
-                    rotPoint = transform.position + new Vector3(0.0f, -0.5f, -0.5f);
-                }
+                // roll sideways along Z while remaining lying X
+                int newTileZ = RoundToTile(startPos.z) + (dir.z > 0 ? 1 : -1);
+                finalPos = new Vector3(startPos.x, 0.5f, newTileZ);
+                pivot = startPos + new Vector3(0f, -0.5f, dir.z * 0.5f);
+                axis = Vector3.right * (dir.z > 0 ? 1f : -1f);
+                // orientation remains LyingX
             }
         }
-    }
+        else // LyingZ
+        {
+            int minTileZ = Mathf.RoundToInt(startPos.z - 0.5f);
+            int tileX = RoundToTile(startPos.x);
 
+            if (Mathf.Abs(dir.z) > 0.5f)
+            {
+                int newTileZ = dir.z > 0 ? (minTileZ + 1) : minTileZ;
+                finalPos = new Vector3(tileX, 1f, newTileZ);
+                pivot = startPos + new Vector3(0f, -0.5f, dir.z * 1f);
+                axis = Vector3.right * (dir.z > 0 ? 1f : -1f);
+                orientation = Orientation.Standing;
+            }
+            else
+            {
+                int newTileX = RoundToTile(startPos.x) + (dir.x > 0 ? 1 : -1);
+                finalPos = new Vector3(newTileX, 0.5f, startPos.z);
+                pivot = startPos + new Vector3(dir.x * 0.5f, -0.5f, 0f);
+                axis = Vector3.forward * (dir.x > 0 ? -1f : 1f);
+                // orientation remains LyingZ
+            }
+        }
+
+        // Animate rotation by 90 degrees around pivot
+        float remaining = 90f;
+        while (remaining > 0f)
+        {
+            float step = rotSpeed * Time.deltaTime;
+            if (step > remaining) step = remaining;
+            transform.RotateAround(pivot, axis, step);
+            remaining -= step;
+            yield return null;
+        }
+
+        // Compute final rotation relative to start
+        if (axis != Vector3.zero)
+        {
+            finalRot = Quaternion.AngleAxis(90f, axis.normalized) * startRot;
+            transform.rotation = finalRot;
+        }
+
+        // Snap final position exactly to grid-calculated finalPos and apply alignment offset
+        transform.position = finalPos + alignmentOffset;
+
+        // Snap small floating errors
+        Vector3 p = transform.position;
+        p.x = (float)Math.Round(p.x * 1000f) / 1000f;
+        p.y = (float)Math.Round(p.y * 1000f) / 1000f;
+        p.z = (float)Math.Round(p.z * 1000f) / 1000f;
+        transform.position = p;
+
+        // After move, check grounded
+        if (!IsGrounded()) StartFall();
+
+        isMoving = false;
+    }
 }
