@@ -60,6 +60,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: TileOrange
       objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 43eb187687c9e344d89000449bacb908, type: 3}
+      propertyPath: m_TagString
+      value: Tile
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
