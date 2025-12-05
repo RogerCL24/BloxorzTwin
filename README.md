@@ -11,10 +11,10 @@
 Esta es nuestra guía de trabajo, ordenada por prioridad. Marcamos una casilla cuando la funcionalidad esté terminada y subida a Git.
 
 ### Hito 1: Setup Inicial y Assets
-* [ ] **Diseño del Bloque:** Crear/Descargar el modelo 3D del bloque (jugador) y los tiles básicos (suelo, meta, botón, etc.).
-* [ ] **Cámara Ortográfica:** Configurar la `Main Camera` como Ortográfica en el Inspector.
-* [ ] **Crear Escenas:** Crear las 3 escenas (`Menu`, `Level_1`, `Credits`).
-* [ ] **Navegación:** Script simple para que los botones del Menú carguen las escenas `Level_1` y `Credits`.
+* [x] **Diseño del Bloque:** Crear/Descargar el modelo 3D del bloque (jugador) y los tiles básicos (suelo, meta, botón, etc.).
+* [X] **Cámara Ortográfica:** Configurar la `Main Camera` como Ortográfica en el Inspector.
+* [X] **Crear Escenas:** Crear las 3 escenas (`Menu`, `Level_1`, `Credits`).
+* [X] **Navegación:** Script simple para que los botones del Menú carguen las escenas `Level_1` y `Credits`.
 * [ ] **Volver al Menú:** Añadir un botón en la escena de juego para volver al `Menu`.
 
 ### Hito 2: El Movimiento del Bloque (Núcleo)
@@ -24,9 +24,9 @@ Esta es nuestra guía de trabajo, ordenada por prioridad. Marcamos una casilla c
 * [ ] **Control de Estado:** Bloquear el input del jugador mientras la rotación se está ejecutando (para evitar movimientos dobles).
 
 ### Hito 3: Ganar y Perder (Lógica de Juego)
-* [ ] **Caída (Perder):** Detectar si el bloque cae de la plataforma.
-* [ ] **Reiniciar Nivel:** Recargar la escena actual cuando el jugador pierde.
-* [ ] **Tile de Meta (Ganar):** Crear un Prefab para la meta.
+* [X] **Caída (Perder):** Detectar si el bloque cae de la plataforma.
+* [X] **Reiniciar Nivel:** Recargar la escena actual cuando el jugador pierde.
+* [X] **Tile de Meta (Ganar):** Crear un Prefab para la meta.
 * [ ] **Detección de Victoria:** Detectar si el bloque está en **vertical** sobre la meta.
 * [ ] **Cargar Siguiente Nivel:** Cargar el `Level_2` (y así sucesivamente) al ganar.
 
@@ -40,10 +40,10 @@ Esta es nuestra guía de trabajo, ordenada por prioridad. Marcamos una casilla c
 * [ ] **Re-Unión:** Si los dos cubos se tocan, vuelven a ser un bloque.
 
 ### Hito 5: Contenido y Pulido
-* [ ] **Diseño de 10 Niveles:** Crear 10 escenas de nivel con dificultad creciente.
+* [X] **Diseño de 10 Niveles:** Crear 10 escenas de nivel con dificultad creciente.
 * [ ] **UI (Movimientos):** Mostrar el contador de movimientos en la interfaz.
 * [ ] **Atajos de Nivel:** Teclas '0' al '9' para cargar niveles directamente.
-* [ ] **Fondos:** Añadir un fondo no sólido a los niveles.
+* [X] **Fondos:** Añadir un fondo no sólido a los niveles.
 * [ ] **Sonido y Música:** Implementar música de fondo y efectos de sonido.
 * [ ] **Feedback (Animación):**
     * [ ] Animación de tiles apareciendo al inicio del nivel.
