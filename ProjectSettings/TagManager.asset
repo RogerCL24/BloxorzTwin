@@ -5,6 +5,11 @@ TagManager:
   serializedVersion: 3
   tags:
   - Tile
+  - Bridge
+  - Cross
+  - Divisor
+  - Final
+  - Orange
   layers:
   - Default
   - TransparentFX

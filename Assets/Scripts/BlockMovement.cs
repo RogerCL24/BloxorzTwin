@@ -43,8 +43,12 @@ public class BlockMovement : MonoBehaviour
     private Vector3 initialPosition;
     private Quaternion initialRotation;
     
+    private MapCreation mapCreation;
+
     void Start()
     {
+        mapCreation = FindFirstObjectByType<MapCreation>();
+
         // compute world-space size: prefer colliders on children, then renderers, else lossyScale
         scale = transform.lossyScale;
         // compute combined bounds
@@ -302,26 +306,40 @@ public class BlockMovement : MonoBehaviour
         float rightUpDot = Mathf.Abs(Vector3.Dot(transform.right, Vector3.up));
         float forwardUpDot = Mathf.Abs(Vector3.Dot(transform.forward, Vector3.up));
 
+        // Tile center is at y=0.25, size.y is 0.07.
+        // Top surface is at center.y + size.y/2 = 0.25 + 0.035 = 0.285
+        float groundHeight = 0.25f + (0.07f / 2f);
+
         if (upDot > 0.9f)
         {
             // Standing (vertical)
             pos.x = Mathf.Round(pos.x);
             pos.z = Mathf.Round(pos.z);
-            pos.y = worldSize.y / 2f; // half height
+            pos.y = worldSize.y / 2f + groundHeight; // half height + ground
         }
         else if (rightUpDot > 0.9f)
         {
             // Lying along X (block height equals scale.x)
-            pos.x = Mathf.Round(pos.x * 2f) / 2f; // snap to halves
+            // If block is 2 units long (worldSize.y > 1.5), snap to .5, else integer
+            if (worldSize.y > 1.5f)
+                pos.x = Mathf.Floor(pos.x) + 0.5f;
+            else
+                pos.x = Mathf.Round(pos.x);
+
             pos.z = Mathf.Round(pos.z);
-            pos.y = worldSize.x / 2f;
+            pos.y = worldSize.x / 2f + groundHeight;
         }
         else if (forwardUpDot > 0.9f)
         {
             // Lying along Z
             pos.x = Mathf.Round(pos.x);
-            pos.z = Mathf.Round(pos.z * 2f) / 2f;
-            pos.y = worldSize.z / 2f;
+            
+            if (worldSize.y > 1.5f)
+                pos.z = Mathf.Floor(pos.z) + 0.5f;
+            else
+                pos.z = Mathf.Round(pos.z);
+
+            pos.y = worldSize.z / 2f + groundHeight;
         }
 
         transform.position = pos;
@@ -332,6 +350,38 @@ public class BlockMovement : MonoBehaviour
         euler.y = Mathf.Round(euler.y / 90f) * 90f;
         euler.z = Mathf.Round(euler.z / 90f) * 90f;
         transform.eulerAngles = euler;
+
+        // Check for win condition
+        float upDotCheck = Vector3.Dot(transform.up, Vector3.up);
+        
+        // Check what we are standing on
+        RaycastHit hit;
+        if (Physics.Raycast(transform.position, Vector3.down, out hit, 2.0f))
+        {
+             if (hit.collider.CompareTag("Finish"))
+             {
+                 if (Mathf.Abs(upDotCheck) > 0.9f)
+                 {
+                     if (mapCreation != null)
+                     {
+                         mapCreation.LoadNextLevel();
+                     }
+                 }
+             }
+             else if (hit.collider.name == "BridgeButton")
+             {
+                 if (showDebug) Debug.Log("Bridge Button Activated");
+                 // TODO: Implement bridge activation
+             }
+             else if (hit.collider.name == "CrossButton")
+             {
+                 if (Mathf.Abs(upDotCheck) > 0.9f)
+                 {
+                     if (showDebug) Debug.Log("Cross Button Activated");
+                     // TODO: Implement cross bridge activation
+                 }
+             }
+        }
 
         if (showDebug) Debug.Log("Snapped to grid: " + transform.position + " rot=" + transform.eulerAngles);
     }
@@ -395,16 +445,31 @@ public class BlockMovement : MonoBehaviour
     
     void OnCollisionExit(Collision theCollision)
     {
-        if (theCollision.gameObject.tag == "Tile" || theCollision.gameObject.CompareTag("Tile"))
         if (theCollision.gameObject.CompareTag("Tile"))
         {
             if (groundColliders.Remove(theCollision.collider))
             {
-            isGrounded = false;
-            if (showDebug)
-                Debug.Log("Block LEFT the ground");
                 isGrounded = groundColliders.Count > 0;
                 if (showDebug) Debug.Log("Removed collider (Exit); groundedCount=" + groundColliders.Count);
+            }
+        }
+    }
+
+    void OnTriggerEnter(Collider other)
+    {
+        if (other.gameObject.name == "BorderBlock")
+        {
+            if (showDebug) Debug.Log("Hit BorderBlock - Forcing Fall");
+            isGrounded = false;
+            groundColliders.Clear();
+            
+            // Force physics to take over immediately
+            Rigidbody rb = GetComponent<Rigidbody>();
+            if (rb != null)
+            {
+                rb.WakeUp();
+                // Optional: Apply a small downward impulse to ensure it doesn't stick
+                rb.AddForce(Vector3.down * 2f, ForceMode.VelocityChange);
             }
         }
     }

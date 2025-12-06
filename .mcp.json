@@ -1,0 +1,10 @@
+{
+  "inputs": [],
+  "servers": {
+    "UNITYMCP": {
+      "type": "sse",
+      "url": "http://localhost:8080/mcp",
+      "headers": {}
+    }
+  }
+}

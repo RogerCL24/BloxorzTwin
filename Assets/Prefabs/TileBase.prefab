@@ -10,7 +10,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: -8679921383154817045, guid: 8d8af00b7425d1d48b6fe39ffdfeeb6d, type: 3}
       propertyPath: m_LocalScale.y
-      value: 1.5
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 8d8af00b7425d1d48b6fe39ffdfeeb6d, type: 3}
       propertyPath: m_LocalPosition.x
@@ -18,7 +18,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 8d8af00b7425d1d48b6fe39ffdfeeb6d, type: 3}
       propertyPath: m_LocalPosition.y
-      value: -0.372
+      value: -0.05
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 8d8af00b7425d1d48b6fe39ffdfeeb6d, type: 3}
       propertyPath: m_LocalPosition.z
@@ -61,8 +61,16 @@ PrefabInstance:
       value: TileBase
       objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: 8d8af00b7425d1d48b6fe39ffdfeeb6d, type: 3}
+      propertyPath: m_Layer
+      value: 3
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 8d8af00b7425d1d48b6fe39ffdfeeb6d, type: 3}
       propertyPath: m_TagString
       value: Tile
+      objectReference: {fileID: 0}
+    - target: {fileID: 8164078558771037576, guid: 8d8af00b7425d1d48b6fe39ffdfeeb6d, type: 3}
+      propertyPath: m_Layer
+      value: 3
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
