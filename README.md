@@ -18,17 +18,17 @@ Esta es nuestra guía de trabajo, ordenada por prioridad. Marcamos una casilla c
 * [ ] **Volver al Menú:** Añadir un botón en la escena de juego para volver al `Menu`.
 
 ### Hito 2: El Movimiento del Bloque (Núcleo)
-* [ ] **Control de Input:** Leer las teclas WASD / Flechas.
+* [X] **Control de Input:** Leer las teclas WASD / Flechas.
 * [ ] **Cálculo de Pivote:** Calcular el punto correcto (arista) sobre el que el bloque debe rotar.
 * [ ] **Rotación:** Implementar la rotación de 90 grados alrededor del pivote (no un deslizamiento).
-* [ ] **Control de Estado:** Bloquear el input del jugador mientras la rotación se está ejecutando (para evitar movimientos dobles).
+* [X] **Control de Estado:** Bloquear el input del jugador mientras la rotación se está ejecutando (para evitar movimientos dobles).
 
 ### Hito 3: Ganar y Perder (Lógica de Juego)
 * [X] **Caída (Perder):** Detectar si el bloque cae de la plataforma.
 * [X] **Reiniciar Nivel:** Recargar la escena actual cuando el jugador pierde.
 * [X] **Tile de Meta (Ganar):** Crear un Prefab para la meta.
-* [ ] **Detección de Victoria:** Detectar si el bloque está en **vertical** sobre la meta.
-* [ ] **Cargar Siguiente Nivel:** Cargar el `Level_2` (y así sucesivamente) al ganar.
+* [X] **Detección de Victoria:** Detectar si el bloque está en **vertical** sobre la meta.
+* [X] **Cargar Siguiente Nivel:** Cargar el `Level_2` (y así sucesivamente) al ganar.
 
 ### Hito 4: Tiles Especiales (Interacciones)
 * [ ] **Botones Redondos:** Se activan al tocarlos.
@@ -42,7 +42,7 @@ Esta es nuestra guía de trabajo, ordenada por prioridad. Marcamos una casilla c
 ### Hito 5: Contenido y Pulido
 * [X] **Diseño de 10 Niveles:** Crear 10 escenas de nivel con dificultad creciente.
 * [ ] **UI (Movimientos):** Mostrar el contador de movimientos en la interfaz.
-* [ ] **Atajos de Nivel:** Teclas '0' al '9' para cargar niveles directamente.
+* [X] **Atajos de Nivel:** Teclas '0' al '9' para cargar niveles directamente.
 * [X] **Fondos:** Añadir un fondo no sólido a los niveles.
 * [ ] **Sonido y Música:** Implementar música de fondo y efectos de sonido.
 * [ ] **Feedback (Animación):**
