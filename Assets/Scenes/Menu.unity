@@ -619,7 +619,17 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents: []
+    - target: {fileID: 8364353587163070764, guid: a8d2417ef5c9f3c45b79caa64c26a30e, type: 3}
+      propertyPath: duration
+      value: 0.3
+      objectReference: {fileID: 0}
+    - target: {fileID: 8364353587163070764, guid: a8d2417ef5c9f3c45b79caa64c26a30e, type: 3}
+      propertyPath: showDebug
+      value: 0
+      objectReference: {fileID: 0}
+    m_RemovedComponents:
+    - {fileID: 8364353587163070764, guid: a8d2417ef5c9f3c45b79caa64c26a30e, type: 3}
+    - {fileID: 4860564939099585085, guid: a8d2417ef5c9f3c45b79caa64c26a30e, type: 3}
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents:
@@ -1202,8 +1212,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ad3644b54949df64c87407eb1ad0b8a8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MenuPropBehavior
-  rotSpeed: 15
-  moveSpeed: 0.1
+  rotSpeed: 10
+  tiltStrength: 50
+  moveSpeed: 0.05
   widthDistance: 6
   heightDistance: 2.5
 --- !u!1 &1173451261
