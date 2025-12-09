@@ -3,28 +3,28 @@
     "name": "InputSystem_Actions",
     "maps": [
         {
-            "name": "Player",
-            "id": "a3415f07-5dcd-4d99-a2c6-b0c8b4948426",
+            "name": "PlayerControls",
+            "id": "3790dc2e-e7f6-49ba-9f78-1244e1d9da24",
             "actions": [
                 {
-                    "name": "Movement",
-                    "type": "Button",
-                    "id": "6c88cfe8-0864-4bcf-9dac-cfa1f35f7add",
-                    "expectedControlType": "",
+                    "name": "New action",
+                    "type": "Value",
+                    "id": "5121c039-62fc-4c9e-8a11-918687530e18",
+                    "expectedControlType": "Axis",
                     "processors": "",
                     "interactions": "",
-                    "initialStateCheck": false
+                    "initialStateCheck": true
                 }
             ],
             "bindings": [
                 {
                     "name": "",
-                    "id": "7c58221b-0f4b-4e15-bedc-614d8f9a49dc",
+                    "id": "c14d8a03-0200-4e0d-93ca-d820ac6a30f7",
                     "path": "",
                     "interactions": "",
                     "processors": "",
                     "groups": "",
-                    "action": "Movement",
+                    "action": "New action",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }

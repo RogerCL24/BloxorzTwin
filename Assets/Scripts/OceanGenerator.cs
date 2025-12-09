@@ -8,6 +8,9 @@ public class OceanGenerator : MonoBehaviour
     public int zSize = 100;
     public float gridSize = 1.5f; // Larger grid for bigger ocean
 
+    [Header("Visuals")]
+    public Color oceanColor = new Color(0, 0.3f, 0.6f, 0.9f);
+
     [Header("Wave Settings")]
     public float waveHeight = 1.2f;
     public float waveSpeed = 1.5f;
@@ -71,10 +74,14 @@ public class OceanGenerator : MonoBehaviour
         if (renderer.material == null || renderer.material.name.StartsWith("Default"))
         {
              Material oceanMat = new Material(Shader.Find("Standard"));
-             oceanMat.color = new Color(0, 0.3f, 0.6f, 0.9f); // Deep blue
+             oceanMat.color = oceanColor;
              oceanMat.SetFloat("_Glossiness", 0.9f); // Very shiny
              oceanMat.SetFloat("_Metallic", 0.2f);
              renderer.material = oceanMat;
+        }
+        else
+        {
+            renderer.material.color = oceanColor;
         }
     }
 

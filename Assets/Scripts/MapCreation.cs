@@ -1,4 +1,6 @@
 using System;
+using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 
 
@@ -10,18 +12,72 @@ public class MapCreation : MonoBehaviour
 {
     public TextAsset[] maps; 		// Text files containing the maps
     public int currentLevel = 0;
-    public GameObject tile, bridge, cross, divisor, breakable, final; 	// Tile prefab used to instance and build the level
+    public GameObject tile, bridge, cross, divisor, final; 	// Tile prefab used to instance and build the level
+    public GameObject[] breakables; // Array of breakable tile prefabs
     public GameObject bridgeTile; // New bridge tile prefab
+    public GlobalAudio globalAudio; // Reference to global audio (optional, auto-found)
+    public ScreenFader screenFader; // Optional fade controller (auto-created if null)
+    [Header("Physics")]
+    public bool overrideGravity = true;
+    public Vector3 gravityOverride = new Vector3(0, -8f, 0);
     //cross, divisor, breakable
     
     private PlayerSpawner playerSpawner; // Reference to the PlayerSpawner component
+    private Dictionary<Vector2Int, GameObject> levelTiles = new Dictionary<Vector2Int, GameObject>();
+
+    private int mapHeight;
+    private Vector3 startPlayerPos;
+    private bool levelTransitionRunning = false;
+    private bool introInProgress = false;
+    private bool introCompleted = false;
+    private bool isLoadingMap = false;
+    private float playerLiftHeight = 30f;
+    private float playerDropHeight = 5f;
 
     // Start is called once after the MonoBehaviour is created
     void Start()
     {
         // Get the PlayerSpawner component from this GameObject
         playerSpawner = GetComponent<PlayerSpawner>();
+
+        if (globalAudio == null)
+            globalAudio = FindFirstObjectByType<GlobalAudio>();
+        if (globalAudio == null)
+        {
+            // Auto-create a global audio manager if none exists
+            GameObject audioObj = new GameObject("GlobalAudio");
+            globalAudio = audioObj.AddComponent<GlobalAudio>();
+        }
+
+        if (screenFader == null)
+            screenFader = FindFirstObjectByType<ScreenFader>();
+        if (screenFader == null)
+        {
+            GameObject fadeObj = new GameObject("ScreenFader");
+            screenFader = fadeObj.AddComponent<ScreenFader>();
+        }
+
+        if (overrideGravity)
+        {
+            Physics.gravity = gravityOverride;
+        }
+        EnsureMoveSystems();
         LoadLevel(currentLevel);
+    }
+
+    private void EnsureMoveSystems()
+    {
+        if (MoveTracker.Instance == null)
+        {
+            GameObject trackerObj = new GameObject("MoveTracker");
+            trackerObj.AddComponent<MoveTracker>();
+        }
+
+        if (FindFirstObjectByType<MoveDisplay>() == null)
+        {
+            GameObject displayObj = new GameObject("MoveDisplayUI");
+            displayObj.AddComponent<MoveDisplay>();
+        }
     }
 
     void Update()
@@ -31,39 +87,112 @@ public class MapCreation : MonoBehaviour
             Debug.Log("Reloading level...");
             LoadLevel(currentLevel);
         }
+
+        if (Input.GetMouseButtonDown(0))
+        {
+            Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+            if (Physics.Raycast(ray, out RaycastHit hit))
+            {
+                Vector3 pos = hit.transform.position;
+                int x = Mathf.RoundToInt(pos.x);
+                int z = Mathf.RoundToInt(pos.z);
+                int row = mapHeight - 1 - z;
+                Vector3 relative = new Vector3(x, 0, z) - new Vector3(startPlayerPos.x, 0, startPlayerPos.z);
+
+                Debug.Log($"[DEBUG] Object: {hit.transform.name} | Unity Pos: ({x}, {z}) | Map Coord (Col, Row): ({x}, {row}) | Rel to Start: ({relative.x}, {relative.z})");
+            }
+        }
     }
 
-    public void LoadLevel(int levelIndex)
+    public void LoadLevel(int levelIndex, bool skipFade = false)
     {
-        if (maps == null || maps.Length == 0) return;
-        if (levelIndex < 0 || levelIndex >= maps.Length)
+        if (isLoadingMap)
         {
-            Debug.Log("Level index out of bounds or all levels completed.");
+            Debug.LogWarning("MapCreation: Level load already running.");
             return;
         }
 
-        // Clear existing level
+        StartCoroutine(LoadLevelRoutine(levelIndex, skipFade));
+    }
+
+    private IEnumerator LoadLevelRoutine(int levelIndex, bool skipFade)
+    {
+        if (maps == null || maps.Length == 0)
+        {
+            yield break;
+        }
+
+        if (levelIndex < 0 || levelIndex >= maps.Length)
+        {
+            Debug.Log("Level index out of bounds or all levels completed.");
+            yield break;
+        }
+
+        isLoadingMap = true;
+        currentLevel = levelIndex;
+        MoveTracker.Instance?.ResetCurrentLevel();
+        levelTransitionRunning = false;
+        introInProgress = false;
+        introCompleted = false;
+
+        if (!skipFade && screenFader != null)
+        {
+            yield return screenFader.FadeTo(1f, 0.4f);
+        }
+
+        PreparePlayerForLevelLoad();
+
+        List<(Transform t, Vector3 target)> introTiles = new List<(Transform, Vector3)>();
+        Vector3 playerSpawnPos = BuildLevel(levelIndex, introTiles);
+
+        introInProgress = true;
+        introCompleted = false;
+        yield return StartCoroutine(LevelIntroRoutine(introTiles));
+
+        CompletePlayerPlacement(playerSpawnPos);
+
+        if (!skipFade && screenFader != null)
+        {
+            yield return screenFader.FadeTo(0f, 0.6f);
+        }
+
+        isLoadingMap = false;
+    }
+
+    private Vector3 BuildLevel(int levelIndex, List<(Transform t, Vector3 target)> introTiles)
+    {
         foreach (Transform child in transform)
         {
             Destroy(child.gameObject);
         }
+        levelTiles.Clear();
 
         TextAsset map = maps[levelIndex];
-        string[] lines = map.text.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+        string[] allLines = map.text.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
         
-        int sizeZ = lines.Length;
+        List<string> mapLines = new List<string>();
+        List<string> configLines = new List<string>();
+        
+        foreach (var line in allLines)
+        {
+            if (line.Contains(";")) configLines.Add(line);
+            else mapLines.Add(line);
+        }
+        
+        int sizeZ = mapLines.Count;
+        mapHeight = sizeZ;
         int sizeX = 0;
-        foreach (string line in lines) if (line.Length > sizeX) sizeX = line.Length;
+        foreach (string line in mapLines) if (line.Length > sizeX) sizeX = line.Length;
 
         char[,] mapGrid = new char[sizeX, sizeZ];
         for(int x=0; x<sizeX; x++) for(int z=0; z<sizeZ; z++) mapGrid[x,z] = 'E';
 
         Vector3 playerSpawnPos = Vector3.zero;
-        
-        for (int i = 0; i < lines.Length; i++)
+
+        for (int i = 0; i < mapLines.Count; i++)
         {
             int z = sizeZ - 1 - i;
-            string line = lines[i];
+            string line = mapLines[i];
             for (int x = 0; x < line.Length; x++)
             {
                 char tileChar = line[x];
@@ -74,6 +203,7 @@ public class MapCreation : MonoBehaviour
                 {
                     case 'S': // Player spawn point + Normal Tile
                         playerSpawnPos = new Vector3(x, 2, z);
+                        startPlayerPos = playerSpawnPos;
                         tilePrefab = tile;
                         break;
                     case 'T': // Normal tile
@@ -83,7 +213,10 @@ public class MapCreation : MonoBehaviour
                         tilePrefab = bridgeTile;
                         break;
                     case 'B': // Breakable tile
-                        tilePrefab = breakable;
+                        if (breakables != null && breakables.Length > 0)
+                        {
+                            tilePrefab = breakables[UnityEngine.Random.Range(0, breakables.Length)];
+                        }
                         break;
                     case 'D': // Divisor tile
                         tilePrefab = divisor;
@@ -108,33 +241,99 @@ public class MapCreation : MonoBehaviour
                         rotation = Quaternion.Euler(0, -90, 0);
                     }
                     GameObject instance = Instantiate(tilePrefab, pos, rotation, this.transform);
+                    levelTiles[new Vector2Int(x, z)] = instance;
+
+                    introTiles.Add((instance.transform, pos));
+
                     if (tileChar == 'F')
                     {
                         instance.tag = "Finish";
                     }
+                    else if (tileChar == 'B')
+                    {
+                        instance.tag = "Orange";
+                        if (instance.GetComponent<BreakableTile>() == null)
+                            instance.AddComponent<BreakableTile>();
+                    }
                     else if (tileChar == 'H')
                     {
                         instance.name = "BridgeButton";
+                        if (instance.GetComponent<ButtonController>() == null)
+                            instance.AddComponent<ButtonController>();
                     }
                     else if (tileChar == 'X')
                     {
                         instance.name = "CrossButton";
+                        if (instance.GetComponent<ButtonController>() == null)
+                            instance.AddComponent<ButtonController>();
+                    }
+                    else if (tileChar == 'V')
+                    {
+                        if (instance.GetComponent<BridgeTile>() == null)
+                            instance.AddComponent<BridgeTile>();
+                        
+                        // Default disabled
+                        instance.GetComponent<BridgeTile>().SetState(false, true);
                     }
                 }
             }
         }
         
-        // Spawn the player after the level is created
-        if (playerSpawner != null)
+        // Parse Config Lines
+        foreach (var line in configLines)
         {
-            playerSpawner.SpawnPlayer(playerSpawnPos);
-        }
-        else
-        {
-            Debug.LogWarning("MapCreation: PlayerSpawner component not found on this GameObject!");
+            string[] parts = line.Split(';');
+            if (parts.Length < 2) continue;
+
+            string[] btnCoords = parts[0].Split(',');
+            if (btnCoords.Length != 2) continue;
+            int bx = int.Parse(btnCoords[0].Trim());
+            int bRow = int.Parse(btnCoords[1].Trim());
+            int bz = sizeZ - 1 - bRow;
+            
+            if (levelTiles.TryGetValue(new Vector2Int(bx, bz), out GameObject btnObj))
+            {
+                ButtonController ctrl = btnObj.GetComponent<ButtonController>();
+                if (ctrl != null)
+                {
+                    for (int k = 1; k < parts.Length; k++)
+                    {
+                        string[] tileCoords = parts[k].Split(',');
+                        if (tileCoords.Length != 2) continue;
+                        int tx = int.Parse(tileCoords[0].Trim());
+                        int tRow = int.Parse(tileCoords[1].Trim());
+                        int tz = sizeZ - 1 - tRow;
+                        
+                        if (levelTiles.TryGetValue(new Vector2Int(tx, tz), out GameObject tileObj))
+                        {
+                            BridgeTile bt = tileObj.GetComponent<BridgeTile>();
+                            if (bt != null)
+                            {
+                                ctrl.controlledTiles.Add(bt);
+                                Debug.Log($"Linked Button at ({bx},{bRow}) to Bridge at ({tx},{tRow})");
+                            }
+                            else
+                            {
+                                Debug.LogWarning($"Object at ({tx},{tRow}) is not a BridgeTile");
+                            }
+                        }
+                        else
+                        {
+                            Debug.LogWarning($"No tile found at ({tx},{tRow}) [Z={tz}]");
+                        }
+                    }
+                }
+                else
+                {
+                    Debug.LogWarning($"Object at ({bx},{bRow}) is not a Button");
+                }
+            }
+            else
+            {
+                Debug.LogWarning($"No button found at ({bx},{bRow}) [Z={bz}]");
+            }
         }
 
-        // Create border blocks for empty spaces (E) and surroundings
         GameObject borderParent = new GameObject("Border");
         borderParent.transform.parent = this.transform;
         borderParent.transform.localPosition = Vector3.zero;
@@ -147,7 +346,6 @@ public class MapCreation : MonoBehaviour
                 if (x >= 0 && x < sizeX && z >= 0 && z < sizeZ)
                 {
                     char c = mapGrid[x, z];
-                    // Check if it is a valid block type (not E, not space, not null)
                     if (c != 'E' && c != ' ' && c != 0)
                     {
                         isBlock = true;
@@ -167,28 +365,200 @@ public class MapCreation : MonoBehaviour
         }
 
         CenterCamera(sizeX, sizeZ);
-        // CreateBackground(sizeX, sizeZ);
+
+        return playerSpawnPos;
     }
 
-    // void CreateBackground(int sizeX, int sizeZ)
-    // {
-    //     GameObject bgObj = new GameObject("OceanBackground");
-    //     bgObj.transform.parent = this.transform;
-        
-    //     // Center the background on the map
-    //     float centerX = (sizeX - 1) / 2.0f;
-    //     float centerZ = (sizeZ - 1) / 2.0f;
-    //     bgObj.transform.position = new Vector3(centerX, -4f, centerZ); // Position below the map
+    private void PreparePlayerForLevelLoad()
+    {
+        if (playerSpawner == null) return;
 
-    //     OceanGenerator ocean = bgObj.AddComponent<OceanGenerator>();
-        
-    //     // Configure ocean size to be large enough
-    //     // Map size is roughly sizeX by sizeZ. 
-    //     // We want the ocean to extend far beyond
-    //     ocean.xSize = 150;
-    //     ocean.zSize = 150;
-    //     ocean.gridSize = 1.5f;
-    // }
+        GameObject player = playerSpawner.CurrentPlayer;
+        if (player == null)
+        {
+            player = playerSpawner.SpawnPlayer(new Vector3(0, playerLiftHeight, 0));
+        }
+
+        if (player == null) return;
+
+        player.transform.position = new Vector3(0, playerLiftHeight, 0);
+        Rigidbody rb = player.GetComponent<Rigidbody>();
+        if (rb != null)
+        {
+            rb.linearVelocity = Vector3.zero;
+            rb.angularVelocity = Vector3.zero;
+            rb.useGravity = false;
+            rb.isKinematic = true;
+        }
+    }
+
+    private void CompletePlayerPlacement(Vector3 spawnPos)
+    {
+        if (playerSpawner == null) return;
+
+        Vector3 startPos = spawnPos + Vector3.up * playerDropHeight;
+        GameObject player = playerSpawner.SpawnPlayer(startPos);
+        if (player == null) return;
+
+        Rigidbody rb = player.GetComponent<Rigidbody>();
+        if (rb != null)
+        {
+            rb.useGravity = true;
+            rb.isKinematic = false;
+        }
+    }
+
+    private IEnumerator LevelIntroRoutine(List<(Transform t, Vector3 target)> tiles)
+    {
+        float drop = 8f;
+        float duration = 0.6f;
+        float maxDelay = 0.25f;
+
+        List<float> delays = new List<float>(tiles.Count);
+        foreach (var entry in tiles)
+        {
+            entry.t.position = entry.target - Vector3.up * drop;
+            delays.Add(UnityEngine.Random.Range(0f, maxDelay));
+        }
+
+        float time = 0f;
+        while (time < duration + maxDelay)
+        {
+            time += Time.deltaTime;
+            for (int i = 0; i < tiles.Count; i++)
+            {
+                float t = Mathf.Clamp01((time - delays[i]) / duration);
+                t = Mathf.Sin(t * Mathf.PI * 0.5f);
+                if (t > 0f)
+                {
+                    tiles[i].t.position = Vector3.Lerp(tiles[i].target - Vector3.up * drop, tiles[i].target, t);
+                }
+            }
+            yield return null;
+        }
+
+        foreach (var entry in tiles)
+        {
+            entry.t.position = entry.target;
+        }
+
+        introInProgress = false;
+        introCompleted = true;
+    }
+
+    public void StartLevelCompleteSequence()
+    {
+        if (!levelTransitionRunning)
+        {
+            StartCoroutine(LevelCompleteRoutine());
+        }
+    }
+
+    public void StartFailSequence()
+    {
+        if (levelTransitionRunning || isLoadingMap)
+        {
+            return;
+        }
+
+        StartCoroutine(LevelFailRoutine());
+    }
+
+    private IEnumerator LevelCompleteRoutine()
+    {
+        levelTransitionRunning = true;
+
+        MoveTracker.Instance?.CompleteLevel();
+
+        // Play map change sound
+        if (globalAudio != null)
+            globalAudio.PlayMapChange();
+
+        // Rise and spin tiles for a dramatic exit
+        RiseTilesUpSpin();
+
+        // Give some time for the drop to be visible
+        yield return new WaitForSeconds(0.8f);
+
+        // Fade to black
+        if (screenFader != null)
+            yield return screenFader.FadeTo(1f, 0.6f);
+
+        // Small pause in black
+        yield return new WaitForSeconds(0.3f);
+
+        // Advance level
+        currentLevel++;
+        LoadLevel(currentLevel);
+
+        // Fade back in
+        if (screenFader != null)
+            yield return screenFader.FadeTo(0f, 0.6f);
+
+        levelTransitionRunning = false;
+    }
+
+    private IEnumerator LevelFailRoutine()
+    {
+        levelTransitionRunning = true;
+
+        // Drop tiles downward to show failure
+        DropTilesDown();
+
+        // short delay to show fall
+        yield return new WaitForSeconds(0.8f);
+
+        // Fade to black (quick)
+        if (screenFader != null)
+            yield return screenFader.FadeTo(1f, 0.4f);
+
+        // Give player a breath before level reload
+        yield return new WaitForSeconds(2f);
+
+        // Reload current level without duplicating the fade that already ran above
+        LoadLevel(currentLevel, true);
+
+        // Wait until the new map is fully built before fading back in
+        yield return new WaitUntil(() => introCompleted);
+
+        // Fade back in
+        if (screenFader != null)
+            yield return screenFader.FadeTo(0f, 0.4f);
+
+        levelTransitionRunning = false;
+    }
+
+    private void DropTilesDown()
+    {
+        foreach (Transform child in transform)
+        {
+            if (child == null) continue;
+
+            Rigidbody rb = child.GetComponent<Rigidbody>();
+            if (rb == null) rb = child.gameObject.AddComponent<Rigidbody>();
+
+            rb.useGravity = true;
+            rb.isKinematic = false;
+            rb.linearVelocity = Vector3.down * UnityEngine.Random.Range(3f, 7f) + UnityEngine.Random.insideUnitSphere * 3f;
+            rb.angularVelocity = UnityEngine.Random.insideUnitSphere * 4f;
+        }
+    }
+
+    private void RiseTilesUpSpin()
+    {
+        foreach (Transform child in transform)
+        {
+            if (child == null) continue;
+
+            Rigidbody rb = child.GetComponent<Rigidbody>();
+            if (rb == null) rb = child.gameObject.AddComponent<Rigidbody>();
+
+            rb.useGravity = false;
+            rb.isKinematic = false;
+            rb.linearVelocity = Vector3.up * UnityEngine.Random.Range(3f, 6f) + UnityEngine.Random.insideUnitSphere * 2f;
+            rb.angularVelocity = UnityEngine.Random.insideUnitSphere * 5f;
+        }
+    }
 
     void CenterCamera(int sizeX, int sizeZ)
     {
@@ -216,5 +586,4 @@ public class MapCreation : MonoBehaviour
         currentLevel++;
         LoadLevel(currentLevel);
     }
-
 }

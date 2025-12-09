@@ -11,6 +11,7 @@ public class BlockMovement : MonoBehaviour
     [Header("Audio")]
     public AudioClip[] moveSounds;
     public AudioClip fallSound;
+    public AudioClip breakSound;
     
     [Header("Debug")]
     public bool showDebug = false;
@@ -34,7 +35,8 @@ public class BlockMovement : MonoBehaviour
 
     // Track colliders that count as ground to avoid flicker
     private HashSet<Collider> groundColliders = new HashSet<Collider>();
-    
+    private HashSet<GameObject> breakingTiles = new HashSet<GameObject>();
+
     // New Input System (kept as optional fallback)
     private PlayerInput playerInput;
     private InputAction moveAction;
@@ -78,7 +80,6 @@ public class BlockMovement : MonoBehaviour
         }
         else
         {
-            // fallback to transform.lossyScale assuming a 1-unit cube scaled
             worldSize = new Vector3(scale.x, scale.y, scale.z);
         }
         initialPosition = transform.position;
@@ -99,7 +100,6 @@ public class BlockMovement : MonoBehaviour
             }
         }
 
-        // Apply initial gravity
         Rigidbody rb = GetComponent<Rigidbody>();
         if (rb != null)
         {
@@ -110,7 +110,6 @@ public class BlockMovement : MonoBehaviour
             Debug.LogWarning("BlockMovement: No Rigidbody found on " + gameObject.name);
         }
         
-        // Setup New Input System
         playerInput = GetComponent<PlayerInput>();
         if (playerInput != null)
         {
@@ -137,55 +136,66 @@ public class BlockMovement : MonoBehaviour
 
     void Update()
     {
+        // Cheat keys: load level 0-9
+        if (!isRotating)
+        {
+            if (Input.GetKeyDown(KeyCode.Alpha0)) mapCreation?.LoadLevel(0);
+            else if (Input.GetKeyDown(KeyCode.Alpha1)) mapCreation?.LoadLevel(1);
+            else if (Input.GetKeyDown(KeyCode.Alpha2)) mapCreation?.LoadLevel(2);
+            else if (Input.GetKeyDown(KeyCode.Alpha3)) mapCreation?.LoadLevel(3);
+            else if (Input.GetKeyDown(KeyCode.Alpha4)) mapCreation?.LoadLevel(4);
+            else if (Input.GetKeyDown(KeyCode.Alpha5)) mapCreation?.LoadLevel(5);
+            else if (Input.GetKeyDown(KeyCode.Alpha6)) mapCreation?.LoadLevel(6);
+            else if (Input.GetKeyDown(KeyCode.Alpha7)) mapCreation?.LoadLevel(7);
+            else if (Input.GetKeyDown(KeyCode.Alpha8)) mapCreation?.LoadLevel(8);
+            else if (Input.GetKeyDown(KeyCode.Alpha9)) mapCreation?.LoadLevel(9);
+        }
+
         // Auto-reset if fallen too far
         if (transform.position.y < -8f)
         {
-            if (showDebug) Debug.Log("Block fell below threshold, resetting to initial position");
-            ResetToStart();
+            if (showDebug) Debug.Log("Block fell below threshold, triggering fail sequence");
+            if (mapCreation != null)
+            {
+                mapCreation.StartFailSequence();
+            }
+            else
+            {
+                ResetToStart();
+            }
             return; // skip input this frame
         }
 
         if (!isRotating && isGrounded)
         {
-            float x = 0;
-            // Classic Input system
-            x = Input.GetAxisRaw("Horizontal");
+            float x = Input.GetAxisRaw("Horizontal");
             float y = 0;
 
-            // Read input from New Input System if available
+            if (Mathf.Abs(x) < 0.1f)
+            {
+                y = Input.GetAxisRaw("Vertical");
+            }
+
             if (moveAction != null)
             {
                 Vector2 moveInput = moveAction.ReadValue<Vector2>();
-                // prefer new input if non-zero
                 if (Mathf.Abs(moveInput.x) > 0.1f || Mathf.Abs(moveInput.y) > 0.1f)
                 {
                     x = moveInput.x;
-                    // Only process vertical if no horizontal input
                     if (Mathf.Abs(x) < 0.1f)
                         y = moveInput.y;
+                    else
+                        y = 0;
                 }
-                else
-                {
-                    if (x == 0)
-                        y = Input.GetAxisRaw("Vertical");
-                }
-            }
-            else
-            {
-                if (x == 0)
-                    y = Input.GetAxisRaw("Vertical");
             }
 
-            if ((Mathf.Abs(x) > 0.1f || Mathf.Abs(y) > 0.1f) && !isRotating)
+            if (Mathf.Abs(x) > 0.1f || Mathf.Abs(y) > 0.1f)
             {
-                // Normalize to -1, 0, or 1 for trig movement
                 float nx = x > 0.1f ? 1 : (x < -0.1f ? -1 : 0);
                 float ny = y > 0.1f ? 1 : (y < -0.1f ? -1 : 0);
 
-                // map inputs: horizontal -> X movement, vertical -> Z movement
-                // invert horizontal sign so A -> left
-                directionX = -nx;
-                directionZ = ny;
+                directionX = ny;
+                directionZ = nx;
 
                 startPos = transform.position;
                 preRotation = transform.rotation;
@@ -315,17 +325,12 @@ public class BlockMovement : MonoBehaviour
             // Standing (vertical)
             pos.x = Mathf.Round(pos.x);
             pos.z = Mathf.Round(pos.z);
-            pos.y = worldSize.y / 2f + groundHeight; // half height + ground
+            pos.y = worldSize.y / 2f + groundHeight;
         }
         else if (rightUpDot > 0.9f)
         {
-            // Lying along X (block height equals scale.x)
-            // If block is 2 units long (worldSize.y > 1.5), snap to .5, else integer
-            if (worldSize.y > 1.5f)
-                pos.x = Mathf.Floor(pos.x) + 0.5f;
-            else
-                pos.x = Mathf.Round(pos.x);
-
+            // Lying along X (block spans two tiles on the X axis)
+            pos.x = Mathf.Round(pos.x * 2f) / 2f;
             pos.z = Mathf.Round(pos.z);
             pos.y = worldSize.x / 2f + groundHeight;
         }
@@ -333,12 +338,7 @@ public class BlockMovement : MonoBehaviour
         {
             // Lying along Z
             pos.x = Mathf.Round(pos.x);
-            
-            if (worldSize.y > 1.5f)
-                pos.z = Mathf.Floor(pos.z) + 0.5f;
-            else
-                pos.z = Mathf.Round(pos.z);
-
+            pos.z = Mathf.Round(pos.z * 2f) / 2f;
             pos.y = worldSize.z / 2f + groundHeight;
         }
 
@@ -364,26 +364,69 @@ public class BlockMovement : MonoBehaviour
                  {
                      if (mapCreation != null)
                      {
-                         mapCreation.LoadNextLevel();
+                         mapCreation.StartLevelCompleteSequence();
                      }
                  }
              }
              else if (hit.collider.name == "BridgeButton")
              {
                  if (showDebug) Debug.Log("Bridge Button Activated");
-                 // TODO: Implement bridge activation
+                 ButtonController btn = hit.collider.GetComponent<ButtonController>();
+                 if (btn != null) btn.Activate();
              }
              else if (hit.collider.name == "CrossButton")
              {
                  if (Mathf.Abs(upDotCheck) > 0.9f)
                  {
                      if (showDebug) Debug.Log("Cross Button Activated");
-                     // TODO: Implement cross bridge activation
+                     ButtonController btn = hit.collider.GetComponent<ButtonController>();
+                     if (btn != null) btn.Activate();
+                 }
+             }
+             else if (hit.collider.CompareTag("Orange"))
+             {
+                 if (Mathf.Abs(upDotCheck) > 0.9f)
+                 {
+                     StartCoroutine(BreakTile(hit.collider.gameObject));
                  }
              }
         }
 
         if (showDebug) Debug.Log("Snapped to grid: " + transform.position + " rot=" + transform.eulerAngles);
+    }
+
+    private IEnumerator BreakTile(GameObject tile)
+    {
+        if (showDebug) Debug.Log("Breaking tile...");
+        
+        // Optional: Play break sound
+        // if (breakSound != null) AudioSource.PlayClipAtPoint(breakSound, transform.position);
+
+        yield return new WaitForSeconds(0.2f); // Wait a bit before breaking
+        
+        if (breakSound != null)
+        {
+            AudioSource.PlayClipAtPoint(breakSound, transform.position);
+        }
+
+        BreakableTile breakable = tile.GetComponent<BreakableTile>();
+        if (breakable != null)
+        {
+            breakable.Fracture();
+        }
+        else
+        {
+            Destroy(tile);
+        }
+        
+        // Force fall
+        isGrounded = false;
+        Rigidbody rb = GetComponent<Rigidbody>();
+        if (rb != null)
+        {
+            rb.WakeUp();
+        }
+        breakingTiles.Remove(tile);
     }
 
     // this method checks if the player hit the ground and enables the movement if it did
@@ -392,66 +435,52 @@ public class BlockMovement : MonoBehaviour
         if (showDebug)
             Debug.Log("Collision Enter: " + theCollision.gameObject.name + " (Tag: " + theCollision.gameObject.tag + ")");
 
-        if (theCollision.gameObject.tag == "Tile" || theCollision.gameObject.CompareTag("Tile"))
-        // consider only tile collisions
-        if (theCollision.gameObject.CompareTag("Tile"))
+        if (IsGroundCollision(theCollision))
         {
-            // check contact normals to ensure collision is from below
-            foreach (ContactPoint cp in theCollision.contacts)
+            groundColliders.Add(theCollision.collider);
+            isGrounded = true;
+            if (showDebug) Debug.Log("Block is now GROUNDED (Enter) with " + theCollision.collider.name);
+            TryBreakTile(theCollision);
+        }
+    }
+    private void TryBreakTile(Collision collision)
+    {
+        if (collision == null) return;
+        GameObject tile = collision.gameObject;
+        if (tile == null || !tile.CompareTag("Orange") || breakingTiles.Contains(tile))
+            return;
+
+        float upDot = Mathf.Abs(Vector3.Dot(transform.up, Vector3.up));
+        if (upDot > 0.9f)
+        {
+            foreach (ContactPoint cp in collision.contacts)
             {
                 if (Vector3.Dot(cp.normal, Vector3.up) > 0.5f)
                 {
-                    groundColliders.Add(theCollision.collider);
-                    isGrounded = true;
-            if (showDebug)
-                Debug.Log("Block is now GROUNDED");
-                    if (showDebug) Debug.Log("Block is now GROUNDED (Enter) with " + theCollision.collider.name);
+                    breakingTiles.Add(tile);
+                    StartCoroutine(BreakTile(tile));
                     break;
                 }
             }
         }
     }
-    
+
     void OnCollisionStay(Collision theCollision)
     {
-        if (theCollision.gameObject.CompareTag("Tile"))
+        if (IsGroundCollision(theCollision))
         {
-            bool anyBelow = false;
-            foreach (ContactPoint cp in theCollision.contacts)
-            {
-                if (Vector3.Dot(cp.normal, Vector3.up) > 0.5f)
-                {
-                    anyBelow = true;
-                    break;
-                }
-            }
-            if (anyBelow)
-            {
-                groundColliders.Add(theCollision.collider);
-                isGrounded = true;
-                if (showDebug) Debug.Log("Block is GROUNDED (Stay) with " + theCollision.collider.name);
-            }
-            else
-            {
-                // if no suitable contact, ensure collider removed
-                if (groundColliders.Remove(theCollision.collider))
-                {
-                    isGrounded = groundColliders.Count > 0;
-                    if (showDebug) Debug.Log("Removed collider in Stay; groundedCount=" + groundColliders.Count);
-                }
-            }
+            groundColliders.Add(theCollision.collider);
+            isGrounded = true;
+            TryBreakTile(theCollision);
         }
     }
-    
+
     void OnCollisionExit(Collision theCollision)
     {
-        if (theCollision.gameObject.CompareTag("Tile"))
+        if (theCollision.gameObject.CompareTag("Tile") || theCollision.gameObject.CompareTag("Orange"))
         {
-            if (groundColliders.Remove(theCollision.collider))
-            {
-                isGrounded = groundColliders.Count > 0;
-                if (showDebug) Debug.Log("Removed collider (Exit); groundedCount=" + groundColliders.Count);
-            }
+            groundColliders.Remove(theCollision.collider);
+            isGrounded = groundColliders.Count > 0;
         }
     }
 
@@ -463,15 +492,27 @@ public class BlockMovement : MonoBehaviour
             isGrounded = false;
             groundColliders.Clear();
             
-            // Force physics to take over immediately
             Rigidbody rb = GetComponent<Rigidbody>();
             if (rb != null)
             {
                 rb.WakeUp();
-                // Optional: Apply a small downward impulse to ensure it doesn't stick
                 rb.AddForce(Vector3.down * 2f, ForceMode.VelocityChange);
             }
         }
+    }
+
+    private bool IsGroundCollision(Collision collision)
+    {
+        if (collision == null || (!collision.gameObject.CompareTag("Tile") && !collision.gameObject.CompareTag("Orange")))
+            return false;
+
+        foreach (ContactPoint cp in collision.contacts)
+        {
+            if (Vector3.Dot(cp.normal, Vector3.up) > 0.5f)
+                return true;
+        }
+
+        return false;
     }
     
     /// <summary>
@@ -479,6 +520,14 @@ public class BlockMovement : MonoBehaviour
     /// </summary>
     private void PlayMoveSound()
     {
+        MoveTracker.Instance?.RegisterMove();
+
+        if (GlobalAudio.Instance != null)
+        {
+            GlobalAudio.Instance.PlayMove();
+            return;
+        }
+
         if (moveSounds != null && moveSounds.Length > 0)
         {
             int index = Random.Range(0, moveSounds.Length);
@@ -491,26 +540,33 @@ public class BlockMovement : MonoBehaviour
     /// </summary>
     private void ResetToStart()
     {
-        transform.position = initialPosition;
-        transform.rotation = initialRotation;
-        Rigidbody rb = GetComponent<Rigidbody>();
-        if (rb != null)
+        if (mapCreation != null)
         {
-            rb.linearVelocity = Vector3.zero;
-            rb.angularVelocity = Vector3.zero;
+            mapCreation.LoadLevel(mapCreation.currentLevel);
+        }
+        else
+        {
+            // Fallback if no mapCreation found
+            transform.position = initialPosition;
+            transform.rotation = initialRotation;
+            Rigidbody rb = GetComponent<Rigidbody>();
+            if (rb != null)
+            {
+                rb.linearVelocity = Vector3.zero;
+                rb.angularVelocity = Vector3.zero;
+            }
+            
+            // Reinitialize states
+            isRotating = false;
+            directionX = 0;
+            directionZ = 0;
+            rotationTime = 0;
+            isGrounded = false;
+            
+            // Ensure snapped correctly
+            SnapToGrid();
         }
         
-        // Reinitialize states
-        isRotating = false;
-        directionX = 0;
-        directionZ = 0;
-        rotationTime = 0;
-        isGrounded = false;
-        groundColliders.Clear();
-        
-        // Ensure snapped correctly
-        SnapToGrid();
-        
-        if (showDebug) Debug.Log("Reset to initial position/rotation");
+        if (showDebug) Debug.Log("Reset/Reload level triggered");
     }
 }
