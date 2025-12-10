@@ -13,6 +13,9 @@ public class MapCreation : MonoBehaviour
     public TextAsset[] maps; 		// Text files containing the maps
     public int currentLevel = 0;
     public GameObject tile, bridge, cross, divisor, final; 	// Tile prefab used to instance and build the level
+    [Header("Divisor Prefabs")]
+    public GameObject singleBlockPrefabA;
+    public GameObject singleBlockPrefabB;
     public GameObject[] breakables; // Array of breakable tile prefabs
     public GameObject bridgeTile; // New bridge tile prefab
     public GlobalAudio globalAudio; // Reference to global audio (optional, auto-found)
@@ -267,11 +270,15 @@ public class MapCreation : MonoBehaviour
                         if (instance.GetComponent<ButtonController>() == null)
                             instance.AddComponent<ButtonController>();
                     }
+                    else if (tileChar == 'D')
+                    {
+                        instance.name = "DivisorButton";
+                        // Aquí podrías agregar un componente específico si lo necesitas
+                    }
                     else if (tileChar == 'V')
                     {
                         if (instance.GetComponent<BridgeTile>() == null)
                             instance.AddComponent<BridgeTile>();
-                        
                         // Default disabled
                         instance.GetComponent<BridgeTile>().SetState(false, true);
                     }
@@ -293,39 +300,91 @@ public class MapCreation : MonoBehaviour
             
             if (levelTiles.TryGetValue(new Vector2Int(bx, bz), out GameObject btnObj))
             {
-                ButtonController ctrl = btnObj.GetComponent<ButtonController>();
-                if (ctrl != null)
+                // Check if it's a DivisorButton or a BridgeButton/CrossButton
+                if (btnObj.name == "DivisorButton")
                 {
-                    for (int k = 1; k < parts.Length; k++)
+                    // For divisor buttons, expect exactly 2 coordinate pairs for split positions
+                    if (parts.Length >= 3)
                     {
-                        string[] tileCoords = parts[k].Split(',');
-                        if (tileCoords.Length != 2) continue;
-                        int tx = int.Parse(tileCoords[0].Trim());
-                        int tRow = int.Parse(tileCoords[1].Trim());
-                        int tz = sizeZ - 1 - tRow;
+                        string[] posACoords = parts[1].Split(',');
+                        string[] posBCoords = parts[2].Split(',');
                         
-                        if (levelTiles.TryGetValue(new Vector2Int(tx, tz), out GameObject tileObj))
+                        if (posACoords.Length == 2 && posBCoords.Length == 2)
                         {
-                            BridgeTile bt = tileObj.GetComponent<BridgeTile>();
-                            if (bt != null)
-                            {
-                                ctrl.controlledTiles.Add(bt);
-                                Debug.Log($"Linked Button at ({bx},{bRow}) to Bridge at ({tx},{tRow})");
-                            }
-                            else
-                            {
-                                Debug.LogWarning($"Object at ({tx},{tRow}) is not a BridgeTile");
-                            }
-                        }
-                        else
-                        {
-                            Debug.LogWarning($"No tile found at ({tx},{tRow}) [Z={tz}]");
+                            int axPos = int.Parse(posACoords[0].Trim());
+                            int aRowPos = int.Parse(posACoords[1].Trim());
+                            int azPos = sizeZ - 1 - aRowPos;
+                            
+                            int bxPos = int.Parse(posBCoords[0].Trim());
+                            int bRowPos = int.Parse(posBCoords[1].Trim());
+                            int bzPos = sizeZ - 1 - bRowPos;
+                            
+                            // Store split positions in the button GameObject for later retrieval
+                            DivisorButtonData dbData = btnObj.GetComponent<DivisorButtonData>();
+                            if (dbData == null)
+                                dbData = btnObj.AddComponent<DivisorButtonData>();
+                            
+                            dbData.splitPositionA = new Vector3(axPos, 2, azPos);
+                            dbData.splitPositionB = new Vector3(bxPos, 2, bzPos);
+                            
+                            Debug.Log($"Linked DivisorButton at ({bx},{bRow}) to split positions ({axPos},{aRowPos}) and ({bxPos},{bRowPos})");
                         }
                     }
                 }
                 else
                 {
-                    Debug.LogWarning($"Object at ({bx},{bRow}) is not a Button");
+                    // BridgeButton or CrossButton
+                    ButtonController ctrl = btnObj.GetComponent<ButtonController>();
+                    if (ctrl != null)
+                    {
+                        // Detect optional mode token immediately after button coords
+                        int startIndex = 1; // default: parts[1] is a tile coord
+                        if (parts.Length > 1)
+                        {
+                            string token = parts[1].Trim();
+                            if (string.Equals(token, "O", StringComparison.OrdinalIgnoreCase))
+                            {
+                                ctrl.mode = ButtonController.Mode.OpenOnly;
+                                startIndex = 2;
+                            }
+                            else if (string.Equals(token, "C", StringComparison.OrdinalIgnoreCase))
+                            {
+                                ctrl.mode = ButtonController.Mode.CloseOnly;
+                                startIndex = 2;
+                            }
+                        }
+
+                        for (int k = startIndex; k < parts.Length; k++)
+                        {
+                            string[] tileCoords = parts[k].Split(',');
+                            if (tileCoords.Length != 2) continue;
+                            int tx = int.Parse(tileCoords[0].Trim());
+                            int tRow = int.Parse(tileCoords[1].Trim());
+                            int tz = sizeZ - 1 - tRow;
+                            
+                            if (levelTiles.TryGetValue(new Vector2Int(tx, tz), out GameObject tileObj))
+                            {
+                                BridgeTile bt = tileObj.GetComponent<BridgeTile>();
+                                if (bt != null)
+                                {
+                                    ctrl.controlledTiles.Add(bt);
+                                    Debug.Log($"Linked Button at ({bx},{bRow}) to Bridge at ({tx},{tRow})");
+                                }
+                                else
+                                {
+                                    Debug.LogWarning($"Object at ({tx},{tRow}) is not a BridgeTile");
+                                }
+                            }
+                            else
+                            {
+                                Debug.LogWarning($"No tile found at ({tx},{tRow}) [Z={tz}]");
+                            }
+                        }
+                    }
+                    else
+                    {
+                        Debug.LogWarning($"Object at ({bx},{bRow}) is not a Button");
+                    }
                 }
             }
             else

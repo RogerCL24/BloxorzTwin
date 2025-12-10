@@ -358,38 +358,69 @@ public class BlockMovement : MonoBehaviour
         RaycastHit hit;
         if (Physics.Raycast(transform.position, Vector3.down, out hit, 2.0f))
         {
-             if (hit.collider.CompareTag("Finish"))
-             {
-                 if (Mathf.Abs(upDotCheck) > 0.9f)
-                 {
-                     if (mapCreation != null)
-                     {
-                         mapCreation.StartLevelCompleteSequence();
-                     }
-                 }
-             }
-             else if (hit.collider.name == "BridgeButton")
-             {
-                 if (showDebug) Debug.Log("Bridge Button Activated");
-                 ButtonController btn = hit.collider.GetComponent<ButtonController>();
-                 if (btn != null) btn.Activate();
-             }
-             else if (hit.collider.name == "CrossButton")
-             {
-                 if (Mathf.Abs(upDotCheck) > 0.9f)
-                 {
-                     if (showDebug) Debug.Log("Cross Button Activated");
-                     ButtonController btn = hit.collider.GetComponent<ButtonController>();
-                     if (btn != null) btn.Activate();
-                 }
-             }
-             else if (hit.collider.CompareTag("Orange"))
-             {
-                 if (Mathf.Abs(upDotCheck) > 0.9f)
-                 {
-                     StartCoroutine(BreakTile(hit.collider.gameObject));
-                 }
-             }
+            if (hit.collider.CompareTag("Finish"))
+            {
+                if (Mathf.Abs(upDotCheck) > 0.9f)
+                {
+                    if (mapCreation != null)
+                    {
+                        mapCreation.StartLevelCompleteSequence();
+                    }
+                }
+            }
+            else if (hit.collider.name == "BridgeButton")
+            {
+                if (showDebug) Debug.Log("Bridge Button Activated");
+                ButtonController btn = hit.collider.GetComponent<ButtonController>();
+                if (btn != null) btn.Activate();
+            }
+            else if (hit.collider.name == "CrossButton")
+            {
+                if (Mathf.Abs(upDotCheck) > 0.9f)
+                {
+                    // Un cubo dividido (split cube) no puede activar cross buttons
+                    SplitBlockController splitCtrl = GetComponent<SplitBlockController>();
+                    if (splitCtrl == null) // Solo el bloque completo puede activar cross buttons
+                    {
+                        if (showDebug) Debug.Log("Cross Button Activated");
+                        ButtonController btn = hit.collider.GetComponent<ButtonController>();
+                        if (btn != null) btn.Activate();
+                    }
+                    else if (showDebug)
+                    {
+                        Debug.Log("Split cube cannot activate Cross Button");
+                    }
+                }
+            }
+            else if (hit.collider.name == "DivisorButton")
+            {
+                if (Mathf.Abs(upDotCheck) > 0.9f)
+                {
+                    if (showDebug) Debug.Log("Divisor Button Activated");
+                    SplitBlockController splitCtrl = GetComponent<SplitBlockController>();
+                    if (splitCtrl != null && !splitCtrl.IsSplit)
+                    {
+                        // Obtener las posiciones de división desde DivisorButtonData
+                        DivisorButtonData divisorData = hit.collider.GetComponent<DivisorButtonData>();
+                        if (divisorData != null)
+                        {
+                            splitCtrl.Split(divisorData.splitPositionA, divisorData.splitPositionB);
+                            if (showDebug) Debug.Log($"Split at positions A={divisorData.splitPositionA} B={divisorData.splitPositionB}");
+                        }
+                        else
+                        {
+                            Debug.LogWarning("DivisorButton missing DivisorButtonData component");
+                        }
+                    }
+                }
+            }
+            else if (hit.collider.CompareTag("Orange"))
+            {
+                if (Mathf.Abs(upDotCheck) > 0.9f)
+                {
+                    StartCoroutine(BreakTile(hit.collider.gameObject));
+                }
+            }
         }
 
         if (showDebug) Debug.Log("Snapped to grid: " + transform.position + " rot=" + transform.eulerAngles);
