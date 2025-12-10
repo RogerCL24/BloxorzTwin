@@ -19,8 +19,8 @@ Esta es nuestra guía de trabajo, ordenada por prioridad. Marcamos una casilla c
 
 ### Hito 2: El Movimiento del Bloque (Núcleo)
 * [X] **Control de Input:** Leer las teclas WASD / Flechas.
-* [ ] **Cálculo de Pivote:** Calcular el punto correcto (arista) sobre el que el bloque debe rotar.
-* [ ] **Rotación:** Implementar la rotación de 90 grados alrededor del pivote (no un deslizamiento).
+* [X] **Cálculo de Pivote:** Calcular el punto correcto (arista) sobre el que el bloque debe rotar.
+* [X] **Rotación:** Implementar la rotación de 90 grados alrededor del pivote (no un deslizamiento).
 * [X] **Control de Estado:** Bloquear el input del jugador mientras la rotación se está ejecutando (para evitar movimientos dobles).
 
 ### Hito 3: Ganar y Perder (Lógica de Juego)
@@ -31,10 +31,10 @@ Esta es nuestra guía de trabajo, ordenada por prioridad. Marcamos una casilla c
 * [X] **Cargar Siguiente Nivel:** Cargar el `Level_2` (y así sucesivamente) al ganar.
 
 ### Hito 4: Tiles Especiales (Interacciones)
-* [ ] **Botones Redondos:** Se activan al tocarlos.
-* [ ] **Puentes:** Lógica para que los botones redondos activen/desactiven puentes.
-* [ ] **Botones en Cruz:** Se activan solo si el bloque está en vertical sobre ellos.
-* [ ] **Tiles Naranjas:** El bloque cae si está en vertical sobre ellos.
+* [X] **Botones Redondos:** Se activan al tocarlos.
+* [X] **Puentes:** Lógica para que los botones redondos activen/desactiven puentes.
+* [X] **Botones en Cruz:** Se activan solo si el bloque está en vertical sobre ellos.
+* [X] **Tiles Naranjas:** El bloque cae si está en vertical sobre ellos.
 * [ ] **Tile de División:** Divide el bloque en dos cubos.
 * [ ] **Control Dividido:** Poder cambiar entre los dos cubos con la tecla Espacio.
 * [ ] **Re-Unión:** Si los dos cubos se tocan, vuelven a ser un bloque.
@@ -44,11 +44,11 @@ Esta es nuestra guía de trabajo, ordenada por prioridad. Marcamos una casilla c
 * [ ] **UI (Movimientos):** Mostrar el contador de movimientos en la interfaz.
 * [X] **Atajos de Nivel:** Teclas '0' al '9' para cargar niveles directamente.
 * [X] **Fondos:** Añadir un fondo no sólido a los niveles.
-* [ ] **Sonido y Música:** Implementar música de fondo y efectos de sonido.
+* [X] **Sonido y Música:** Implementar música de fondo y efectos de sonido.
 * [ ] **Feedback (Animación):**
-    * [ ] Animación de tiles apareciendo al inicio del nivel.
-    * [ ] Animación de victoria (girar y subir).
-    * [ ] Animación de derrota (caer).
+    * [X] Animación de tiles apareciendo al inicio del nivel.
+    * [X] Animación de victoria (girar y subir).
+    * [X] Animación de derrota (caer).
 * [ ] **Feedback (Efectos):** Añadir partículas y sonidos a las interacciones (coger ítems, botones, etc.).
 
 ### Hito 6: Entregables
