@@ -141,7 +141,7 @@ public class MoveDisplay : MonoBehaviour
 
         moveText.raycastTarget = false; // allow clicks to pass through text
 
-        moveText.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+        moveText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
         moveText.fontSize = 22;
         moveText.alignment = TextAnchor.UpperLeft;
         RectTransform rt = moveText.rectTransform;
@@ -237,7 +237,7 @@ public class MoveDisplay : MonoBehaviour
                 labelTransform.gameObject.AddComponent<CanvasRenderer>();
         }
 
-        label.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+        label.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
         label.fontSize = 20;
         label.alignment = TextAnchor.MiddleCenter;
         label.color = Color.white;
