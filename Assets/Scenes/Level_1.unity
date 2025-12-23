@@ -155,7 +155,11 @@ MonoBehaviour:
   - {fileID: 8300000, guid: bf37976d9b35c064d9e4342dce1a97da, type: 3}
   bridgeToggleClip: {fileID: 8300000, guid: 82a84b85dad74cd409c595535422da11, type: 3}
   mapChangeClip: {fileID: 8300000, guid: 8fba3838919af7e48bef7a8078c01ba8, type: 3}
+<<<<<<< HEAD
   gameFailClip: {fileID: 8300000, guid: 2c3d0c6cc9b977444817ac542f5ec304, type: 3}
+=======
+  gameFailClip: {fileID: 0}
+>>>>>>> 077e0d90bf67bc83022425ef91f24c6beec0c7ab
   sfxVolume: 0.365
 --- !u!4 &208145710
 Transform:
@@ -219,8 +223,13 @@ MonoBehaviour:
   cross: {fileID: 1183327749594481434, guid: 236f99916d6844f4eb573e142106d15c, type: 3}
   divisor: {fileID: 5680929025281271583, guid: c5072181f8431f048a778167772d31ac, type: 3}
   final: {fileID: 5514844940401310757, guid: 3a3e747fd9f7dc140ba9001a4f24a31c, type: 3}
+<<<<<<< HEAD
   singleBlockPrefabA: {fileID: 1706077791680042685, guid: cf405b5b273a69f4bbe5342a4d6f8d80, type: 3}
   singleBlockPrefabB: {fileID: 8914261781016638339, guid: 7345f7f8eae8c734696207beb74c61e8, type: 3}
+=======
+  singleBlockPrefabA: {fileID: 3860742869612950439, guid: 12ba274dbffbf2643b3127f075fa2186, type: 3}
+  singleBlockPrefabB: {fileID: 5156655648506608107, guid: 050cfa569de1d58448286fd32bb85255, type: 3}
+>>>>>>> 077e0d90bf67bc83022425ef91f24c6beec0c7ab
   breakables:
   - {fileID: 3196504762043752021, guid: 94526be5798fb774c88448987a5831bf, type: 3}
   - {fileID: 1262166041103931294, guid: 10f1d3b5149dd04408919a271ce359ff, type: 3}

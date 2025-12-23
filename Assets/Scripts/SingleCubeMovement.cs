@@ -211,6 +211,14 @@ public class SingleCubeMovement : MonoBehaviour
         rotationRemaining = 90f;
         rotationDirection = 1f;
 
+<<<<<<< HEAD
+=======
+        // Para un cubo 1x1x1, el punto de pivote está en la arista inferior
+        // hacia la dirección del movimiento.
+        // El centro del cubo está a 0.5 del suelo, y el pivote está en el suelo (y = groundHeight)
+        float groundHeight = 0.25f + (0.07f / 2f); // misma altura que en SnapToGrid
+        float pivotY = transform.position.y - 0.5f; // el pivote está en el suelo, no en -0.5 relativo al centro
+>>>>>>> 077e0d90bf67bc83022425ef91f24c6beec0c7ab
         Vector3 pos = transform.position;
         float pivotY = pos.y; // pivote en la superficie del tile, no en la mitad del cubo
 
@@ -243,6 +251,12 @@ public class SingleCubeMovement : MonoBehaviour
             return;
         }
 
+        Rigidbody rb = GetComponent<Rigidbody>();
+        if (rb != null)
+        {
+            rb.isKinematic = true; // "Modo Fantasma": Se mueve pero no choca ni empuja
+        }
+
         isRotating = true;
         isFalling = false;
 
@@ -258,6 +272,12 @@ public class SingleCubeMovement : MonoBehaviour
 
     private void CompleteMove()
     {
+
+        Rigidbody rb = GetComponent<Rigidbody>();
+        if (rb != null)
+        {
+            rb.isKinematic = false; // "Modo Real": Vuelve a tener peso y gravedad
+        }
         isRotating = false;
         rotationRemaining = 0f;
 
@@ -281,8 +301,16 @@ public class SingleCubeMovement : MonoBehaviour
         gridPosition = new Vector2Int(Mathf.RoundToInt(transform.position.x), Mathf.RoundToInt(transform.position.z));
         GridManager.Instance?.CheckSingleCubePosition(gridPosition);
 
+<<<<<<< HEAD
         // Después de SnapToGrid, el cubo debería estar definitivamente grounded
         isGrounded = true; // forzar grounded después de snap
+=======
+        isGrounded = CheckGroundedByRaycast();
+        if (!isGrounded)
+        {
+            TriggerFall();
+        }
+>>>>>>> 077e0d90bf67bc83022425ef91f24c6beec0c7ab
         isFalling = false;
 
         if (showDebug)
@@ -309,18 +337,38 @@ public class SingleCubeMovement : MonoBehaviour
 
         transform.position = pos;
 
+<<<<<<< HEAD
         // NO resetear rotación - dejar que tenga la rotación que resultó de RotateAround()
         // La rotación visual es parte de la animación y debe ser preservada
+=======
+        // Snap rotation to nearest 90 degrees AND normalize to identity
+        // Un cubo 1x1x1 debería verse igual en cualquier rotación múltiplo de 90
+        // pero para evitar acumulación de errores, normalizar a identidad
+        //transform.rotation = Quaternion.identity;
+
+        Vector3 euler = transform.eulerAngles;
+        euler.x = Mathf.Round(euler.x / 90f) * 90f;
+        euler.y = Mathf.Round(euler.y / 90f) * 90f;
+        euler.z = Mathf.Round(euler.z / 90f) * 90f;
+        transform.eulerAngles = euler;
+
+        // Alternativa: snap a 90 grados si quieres mantener la rotación visual
+        // Vector3 euler = transform.eulerAngles;
+        // euler.x = Mathf.Round(euler.x / 90f) * 90f;
+        // euler.y = Mathf.Round(euler.y / 90f) * 90f;
+        // euler.z = Mathf.Round(euler.z / 90f) * 90f;
+        // transform.eulerAngles = euler;
+>>>>>>> 077e0d90bf67bc83022425ef91f24c6beec0c7ab
     }
 
     private bool CheckGroundedByRaycast()
     {
         RaycastHit hit;
-        // Use a generous distance to cover all orientations
-        if (Physics.Raycast(transform.position, Vector3.down, out hit, 3f, groundMask, QueryTriggerInteraction.Collide))
+        // Lanzamos un rayo hacia abajo
+        if (Physics.Raycast(transform.position, Vector3.down, out hit, 3f, groundMask, QueryTriggerInteraction.Ignore))
         {
-            string n = hit.collider.name;
-            if (hit.collider.CompareTag("Tile") || hit.collider.CompareTag("Orange") || hit.collider.CompareTag("Finish") || n.Contains("Button"))
+            // TRUCO: Si el objeto que tocamos NO es un Trigger (es solido), es suelo valido.
+            if (!hit.collider.isTrigger)
             {
                 return true;
             }
@@ -330,10 +378,7 @@ public class SingleCubeMovement : MonoBehaviour
 
     private void TriggerFall()
     {
-        if (isFalling)
-        {
-            return;
-        }
+        if (isFalling) return;
 
         // NO activar fall si estamos rotando - el movimiento es válido
         if (isRotating)
@@ -352,20 +397,26 @@ public class SingleCubeMovement : MonoBehaviour
 
         isFalling = true;
         isRotating = false;
-        rotationRemaining = 0f;
 
-        // Disable colliders to prevent getting stuck on edges
+        // 1. IMPORTANTE: Activa la gravedad para que caiga a plomo
+        Rigidbody rb = GetComponent<Rigidbody>();
+        if (rb != null)
+        {
+            rb.isKinematic = false; // Deja que la gravedad actúe
+            rb.useGravity = true;
+        }
+
+        // 2. Desactiva los colliders para que no se choque al caer
         Collider[] cols = GetComponentsInChildren<Collider>();
         foreach (var c in cols) c.enabled = false;
 
-        if (fallSound != null)
-        {
-            AudioSource.PlayClipAtPoint(fallSound, transform.position);
-        }
-        
-        if (showDebug) Debug.Log("Single cube triggering fail sequence");
+        if (fallSound != null) AudioSource.PlayClipAtPoint(fallSound, transform.position);
+
+        // 3. Avisa al mapa (si tienes música de derrota, etc)
         mapCreation?.StartFailSequence();
-        ResetToInitialPosition();
+
+        // ❌ BORRA ESTA LÍNEA DE AQUÍ:
+        // ResetToInitialPosition();  <--- ¡ESTO ES LO QUE TE IMPIDE VER LA CAÍDA!
     }
 
     public void ResetToInitialPosition()
@@ -395,7 +446,7 @@ public class SingleCubeMovement : MonoBehaviour
         }
     }
 
-    private void OnTriggerEnter(Collider other)
+    /*private void OnTriggerEnter(Collider other)
     {
         if (other == null) return;
         if (other.name.Contains("BorderBlock") || other.CompareTag("GameOver"))
@@ -408,5 +459,5 @@ public class SingleCubeMovement : MonoBehaviour
                 rb.AddForce(push, ForceMode.Impulse);
             }
         }
-    }
+    }*/
 }
