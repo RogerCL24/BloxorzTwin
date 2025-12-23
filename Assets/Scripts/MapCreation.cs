@@ -133,7 +133,7 @@ public class MapCreation : MonoBehaviour
 
         isLoadingMap = true;
         currentLevel = levelIndex;
-        MoveTracker.Instance?.ResetCurrentLevel();
+        MoveTracker.Instance?.BeginLevelAttempt();
         levelTransitionRunning = false;
         introInProgress = false;
         introCompleted = false;
@@ -273,7 +273,13 @@ public class MapCreation : MonoBehaviour
                     else if (tileChar == 'D')
                     {
                         instance.name = "DivisorButton";
-                        // Aquí podrías agregar un componente específico si lo necesitas
+                        // Ensure the divisor button has a collider for raycast detection
+                        if (instance.GetComponent<Collider>() == null)
+                        {
+                            BoxCollider bc = instance.AddComponent<BoxCollider>();
+                            bc.isTrigger = true;
+                            bc.size = new Vector3(1, 1, 1);
+                        }
                     }
                     else if (tileChar == 'V')
                     {
@@ -309,6 +315,8 @@ public class MapCreation : MonoBehaviour
                         string[] posACoords = parts[1].Split(',');
                         string[] posBCoords = parts[2].Split(',');
                         
+                        Debug.Log($"[DivisorButton Config] parts.Length={parts.Length}, posACoords=[{string.Join(",", posACoords)}], posBCoords=[{string.Join(",", posBCoords)}]");
+                        
                         if (posACoords.Length == 2 && posBCoords.Length == 2)
                         {
                             int axPos = int.Parse(posACoords[0].Trim());
@@ -319,6 +327,8 @@ public class MapCreation : MonoBehaviour
                             int bRowPos = int.Parse(posBCoords[1].Trim());
                             int bzPos = sizeZ - 1 - bRowPos;
                             
+                            Debug.Log($"[DivisorButton Parsed] A: axPos={axPos}, aRowPos={aRowPos}, azPos={azPos} | B: bxPos={bxPos}, bRowPos={bRowPos}, bzPos={bzPos}");
+                            
                             // Store split positions in the button GameObject for later retrieval
                             DivisorButtonData dbData = btnObj.GetComponent<DivisorButtonData>();
                             if (dbData == null)
@@ -327,7 +337,7 @@ public class MapCreation : MonoBehaviour
                             dbData.splitPositionA = new Vector3(axPos, 2, azPos);
                             dbData.splitPositionB = new Vector3(bxPos, 2, bzPos);
                             
-                            Debug.Log($"Linked DivisorButton at ({bx},{bRow}) to split positions ({axPos},{aRowPos}) and ({bxPos},{bRowPos})");
+                            Debug.Log($"Linked DivisorButton at ({bx},{bRow}) [z={bz}] to split positions A=({axPos},{aRowPos})[z={azPos}]={dbData.splitPositionA} and B=({bxPos},{bRowPos})[z={bzPos}]={dbData.splitPositionB}");
                         }
                     }
                 }
@@ -441,6 +451,7 @@ public class MapCreation : MonoBehaviour
         if (player == null) return;
 
         player.transform.position = new Vector3(0, playerLiftHeight, 0);
+        player.GetComponent<SplitBlockController>()?.ResetToMainBlock();
         Rigidbody rb = player.GetComponent<Rigidbody>();
         if (rb != null)
         {
@@ -458,6 +469,14 @@ public class MapCreation : MonoBehaviour
         Vector3 startPos = spawnPos + Vector3.up * playerDropHeight;
         GameObject player = playerSpawner.SpawnPlayer(startPos);
         if (player == null) return;
+
+        // Assign split block prefabs to SplitBlockController
+        SplitBlockController splitCtrl = player.GetComponent<SplitBlockController>();
+        if (splitCtrl != null)
+        {
+            splitCtrl.singleBlockPrefabA = singleBlockPrefabA;
+            splitCtrl.singleBlockPrefabB = singleBlockPrefabB;
+        }
 
         Rigidbody rb = player.GetComponent<Rigidbody>();
         if (rb != null)
@@ -519,6 +538,10 @@ public class MapCreation : MonoBehaviour
         {
             return;
         }
+
+        playerSpawner?.CurrentPlayer?.GetComponent<SplitBlockController>()?.ResetToMainBlock();
+
+        MoveTracker.Instance?.FailLevel();
 
         StartCoroutine(LevelFailRoutine());
     }

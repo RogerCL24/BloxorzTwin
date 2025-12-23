@@ -6,6 +6,7 @@ public class MoveTracker : MonoBehaviour
 
     private int currentLevelMoves = 0;
     private int totalCompletedMoves = 0;
+    private int totalBeforeCurrentLevel = 0;
 
     private void Awake()
     {
@@ -23,16 +24,26 @@ public class MoveTracker : MonoBehaviour
         currentLevelMoves++;
     }
 
-    public void ResetCurrentLevel()
+    public void BeginLevelAttempt()
     {
+        totalBeforeCurrentLevel = totalCompletedMoves;
         currentLevelMoves = 0;
     }
 
     public void CompleteLevel()
     {
         totalCompletedMoves += currentLevelMoves;
-        ResetCurrentLevel();
+        currentLevelMoves = 0;
+        totalBeforeCurrentLevel = totalCompletedMoves;
+    }
+
+    public void FailLevel()
+    {
+        totalCompletedMoves = totalBeforeCurrentLevel;
+        currentLevelMoves = 0;
     }
 
     public int TotalCompletedMoves => totalCompletedMoves;
+
+    public int DisplayTotalMoves => totalBeforeCurrentLevel + currentLevelMoves;
 }

@@ -5706,9 +5706,9 @@ MonoBehaviour:
   moveSounds: []
   fallSound: {fileID: 8300000, guid: 5c9d4797210e1f04987ab87456db70f1, type: 3}
   breakSound: {fileID: 8300000, guid: 950f9bfe10a0daa4d95db2346e0721ad, type: 3}
-  showDebug: 0
+  showDebug: 1
   isRotating: 0
-  isGrounded: 0
+  isGrounded: 1
 --- !u!1 &3011071531363853063
 GameObject:
   m_ObjectHideFlags: 0

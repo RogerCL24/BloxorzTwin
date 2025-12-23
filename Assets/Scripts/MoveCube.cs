@@ -101,6 +101,7 @@ public class MoveCube : MonoBehaviour
     private IEnumerator MoveStep(Vector3 direction)
     {
         isMoving = true;
+        MoveTracker.Instance?.RegisterMove();
         PlayMoveSound();
 
         Vector3 pivot, axis;

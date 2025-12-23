@@ -194,8 +194,8 @@ public class BlockMovement : MonoBehaviour
                 float nx = x > 0.1f ? 1 : (x < -0.1f ? -1 : 0);
                 float ny = y > 0.1f ? 1 : (y < -0.1f ? -1 : 0);
 
-                directionX = ny;
-                directionZ = nx;
+                directionX = -nx;
+                directionZ = ny;
 
                 startPos = transform.position;
                 preRotation = transform.rotation;
@@ -358,6 +358,8 @@ public class BlockMovement : MonoBehaviour
         RaycastHit hit;
         if (Physics.Raycast(transform.position, Vector3.down, out hit, 2.0f))
         {
+            if (showDebug) Debug.Log($"Raycast hit: {hit.collider.name} (Tag: {hit.collider.tag})");
+            
             if (hit.collider.CompareTag("Finish"))
             {
                 if (Mathf.Abs(upDotCheck) > 0.9f)

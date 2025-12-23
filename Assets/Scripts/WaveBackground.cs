@@ -47,16 +47,11 @@ public class WaveBackground : MonoBehaviour
         // Create a simple material for the lines
         if (lineMat == null)
         {
-            Shader shader = Shader.Find("Sprites/Default");
-            if (shader != null)
-            {
-                lineMat = new Material(shader);
-            }
-            else
-            {
-                // Fallback if Sprites/Default isn't found (e.g. URP/HDRP might differ, but usually exists)
-                lineMat = new Material(Shader.Find("Legacy Shaders/Particles/Alpha Blended Premultiply"));
-            }
+            Shader shader = Shader.Find("Universal Render Pipeline/Unlit");
+            if (shader == null) shader = Shader.Find("Sprites/Default");
+            if (shader == null) shader = Shader.Find("Unlit/Color");
+            if (shader == null) shader = Shader.Find("Legacy Shaders/Particles/Alpha Blended Premultiply");
+            lineMat = new Material(shader);
         }
 
         float xStart = -width / 2f;

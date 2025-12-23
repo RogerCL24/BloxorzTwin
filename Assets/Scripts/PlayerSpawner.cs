@@ -31,10 +31,19 @@ public class PlayerSpawner : MonoBehaviour
         {
             GameObject player = Instantiate(playerPrefab, position, Quaternion.identity);
             player.name = "Player"; // Give it a meaningful name in the hierarchy
+            
+            // Ensure SplitBlockController exists for division feature
+            if (player.GetComponent<SplitBlockController>() == null)
+            {
+                player.AddComponent<SplitBlockController>();
+            }
+            
             currentPlayer = player;
         }
         else
         {
+            SplitBlockController splitCtrl = currentPlayer.GetComponent<SplitBlockController>();
+            splitCtrl?.ResetToMainBlock();
             currentPlayer.transform.position = position;
             currentPlayer.transform.rotation = Quaternion.identity;
             Rigidbody rb = currentPlayer.GetComponent<Rigidbody>();

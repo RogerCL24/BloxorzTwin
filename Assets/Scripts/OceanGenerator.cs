@@ -69,20 +69,30 @@ public class OceanGenerator : MonoBehaviour
         mesh.tangents = tangents;
         mesh.RecalculateNormals();
         
-        // Create a nice ocean material
+        // Create a robust ocean material that works in URP/Built-in
         MeshRenderer renderer = GetComponent<MeshRenderer>();
-        if (renderer.material == null || renderer.material.name.StartsWith("Default"))
+        Material mat = renderer.sharedMaterial;
+        bool needsNew = mat == null || mat.name.StartsWith("Default");
+
+        if (needsNew)
         {
-             Material oceanMat = new Material(Shader.Find("Standard"));
-             oceanMat.color = oceanColor;
-             oceanMat.SetFloat("_Glossiness", 0.9f); // Very shiny
-             oceanMat.SetFloat("_Metallic", 0.2f);
-             renderer.material = oceanMat;
+            Shader lit = Shader.Find("Universal Render Pipeline/Lit");
+            Shader unlit = Shader.Find("Unlit/Color");
+            Shader builtin = Shader.Find("Standard");
+
+            Shader chosen = lit != null ? lit : (builtin != null ? builtin : unlit);
+            if (chosen == null)
+            {
+                chosen = Shader.Find("Sprites/Default");
+            }
+
+            mat = new Material(chosen);
+            renderer.material = mat;
         }
-        else
-        {
-            renderer.material.color = oceanColor;
-        }
+
+        mat.color = oceanColor;
+        if (mat.HasProperty("_Glossiness")) mat.SetFloat("_Glossiness", 0.9f);
+        if (mat.HasProperty("_Metallic")) mat.SetFloat("_Metallic", 0.2f);
     }
 
     void Update()

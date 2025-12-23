@@ -38,8 +38,9 @@ public class PlayerMovement : MonoBehaviour
 
             if ((x != 0 || y != 0) && !isRotating)
             {
-                directionX = y;
-                directionZ = x;
+                // Remap inputs so Up=+Z, Right=+X (previously rotated 90º)
+                directionX = -x;   // drives world X displacement
+                directionZ = y;    // drives world Z displacement
                 startPos = transform.position;
                 preRotation = transform.rotation;
                 transform.Rotate(directionZ * 90, 0, directionX * 90, Space.World);
