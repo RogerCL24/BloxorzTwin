@@ -1,23 +1,16 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>
-/// Sistema de gestión de cuadrícula 2D para rastrear la posición lógica del jugador
-/// y activar botones/mecánicas sin depender del sistema de colisiones físicas.
-/// </summary>
 public class GridManager : MonoBehaviour
 {
     private static GridManager instance;
     public static GridManager Instance => instance;
 
-    // Mapa 2D de tiles y botones: posición -> tipo de tile
     private Dictionary<Vector2Int, TileData> gridMap = new Dictionary<Vector2Int, TileData>();
 
-    // Referencia al jugador principal
     private BlockMovement mainBlock;
     private SingleCubeMovement[] splitCubes;
     
-    // Para evitar doble activación de botones en la misma posición
     private HashSet<Vector2Int> processedPositionsThisFrame = new HashSet<Vector2Int>();
 
     void Awake()
@@ -60,13 +53,8 @@ public class GridManager : MonoBehaviour
         splitCubes = null;
     }
 
-    /// <summary>
-    /// Verifica y activa botones basándose en la posición lógica del bloque principal.
-    /// El bloque ocupa 1 tile si está de pie, o 2 tiles si está acostado.
-    /// </summary>
     public void CheckBlockPosition(Vector2Int[] occupiedPositions, bool isUpright)
     {
-        // Limpiar el registro de posiciones procesadas en este frame
         processedPositionsThisFrame.Clear();
         
         foreach (var pos in occupiedPositions)
@@ -140,10 +128,7 @@ public class GridManager : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Verifica y activa botones basándose en la posición lógica de un single cube.
-    /// Los single cubes solo ocupan 1 tile y no pueden activar Cross/Finish/Divisor.
-    /// </summary>
+  
     public void CheckSingleCubePosition(Vector2Int position)
     {
         if (gridMap.TryGetValue(position, out TileData data))
@@ -158,7 +143,7 @@ public class GridManager : MonoBehaviour
                     }
                     break;
 
-                // Single cubes no activan: Finish, Cross, Divisor, Orange
+                // Single cubes no activan: Finish, Cross, Divisor
             }
         }
     }
@@ -187,9 +172,30 @@ public class GridManager : MonoBehaviour
         return TileType.Empty;
     }
 
+    public TileData GetTileData(Vector2Int pos)
+    {
+        if (gridMap.TryGetValue(pos, out TileData data))
+        {
+            return data;
+        }
+        return new TileData { type = TileType.Empty, gameObject = null };
+    }
+
     public bool HasTileAt(Vector2Int pos)
     {
         return gridMap.ContainsKey(pos);
+    }
+
+    public Vector2Int? GetTilePosition(GameObject tileObject)
+    {
+        foreach (var kvp in gridMap)
+        {
+            if (kvp.Value.gameObject == tileObject)
+            {
+                return kvp.Key;
+            }
+        }
+        return null;
     }
 }
 

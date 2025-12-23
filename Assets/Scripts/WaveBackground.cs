@@ -34,7 +34,6 @@ public class WaveBackground : MonoBehaviour
 
     public void InitializeLines()
     {
-        // Clean up existing
         if (linesParent != null) Destroy(linesParent);
         
         linesParent = new GameObject("WaveLinesContainer");
@@ -44,7 +43,6 @@ public class WaveBackground : MonoBehaviour
         lineRenderers.Clear();
         basePositions = new Vector3[linesCount, pointsPerLine];
 
-        // Create a simple material for the lines
         if (lineMat == null)
         {
             Shader shader = Shader.Find("Universal Render Pipeline/Unlit");
@@ -98,18 +96,14 @@ public class WaveBackground : MonoBehaviour
         for (int i = 0; i < linesCount; i++)
         {
             LineRenderer lr = lineRenderers[i];
-            // Optimization: Update positions array directly if possible, but SetPosition is fine for < 5k points
             for (int j = 0; j < pointsPerLine; j++)
             {
                 Vector3 basePos = basePositions[i, j];
 
-                // Algorithm adapted from React code:
                 // const move = noise.perlin2((p.x + time * waveSpeedX) * 0.002, (p.y + time * waveSpeedY) * 0.0015) * 12;
                 // p.wave.x = Math.cos(move) * waveAmpX;
                 // p.wave.y = Math.sin(move) * waveAmpY;
 
-                // We use world coordinates for noise continuity
-                // Note: Mathf.PerlinNoise mirrors at integer values, so we use a larger scale or offset if needed.
                 float noiseVal = Mathf.PerlinNoise(
                     (basePos.x + transform.position.x + time * waveSpeedX) * noiseScale, 
                     (basePos.z + transform.position.z + time * waveSpeedZ) * noiseScale
@@ -118,7 +112,6 @@ public class WaveBackground : MonoBehaviour
                 float offsetX = Mathf.Cos(noiseVal) * waveAmpX;
                 float offsetZ = Mathf.Sin(noiseVal) * waveAmpZ;
 
-                // We can also add some Y height variation for a "sea" feel
                 float offsetY = Mathf.Sin(noiseVal * 0.5f) * (waveAmpX * 0.5f);
 
                 Vector3 newPos = new Vector3(

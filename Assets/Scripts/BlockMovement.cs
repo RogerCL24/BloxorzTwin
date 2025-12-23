@@ -7,6 +7,10 @@ public class BlockMovement : MonoBehaviour
 {
     [Header("Movement Settings")]
     public float duration = 0.3f;
+
+    private InputAction moveAction;
+    public PlayerInput playerInput;
+
     
     [Header("Audio")]
     public AudioClip[] moveSounds;
@@ -21,7 +25,6 @@ public class BlockMovement : MonoBehaviour
     public bool usePhysicsCollisions = false;
     
     Vector3 scale;
-    // actual world-space size of the block (computed from colliders or renderers)
     private Vector3 worldSize;
 
     public bool isRotating = false;
@@ -37,15 +40,10 @@ public class BlockMovement : MonoBehaviour
 
     public bool isGrounded = false;
 
-    // Track colliders that count as ground to avoid flicker
     private HashSet<Collider> groundColliders = new HashSet<Collider>();
     private HashSet<GameObject> breakingTiles = new HashSet<GameObject>();
 
-    // New Input System (kept as optional fallback)
-    private PlayerInput playerInput;
-    private InputAction moveAction;
 
-    // initial transform to reset to if falling too far
     private Vector3 initialPosition;
     private Quaternion initialRotation;
     
@@ -53,10 +51,6 @@ public class BlockMovement : MonoBehaviour
 
     private LayerMask groundMask;
 
-    /// <summary>
-    /// Calcula las posiciones de cuadrícula ocupadas por el bloque según su orientación.
-    /// Retorna 1 posición si está de pie, 2 si está acostado.
-    /// </summary>
     public Vector2Int[] GetOccupiedGridPositions()
     {
         Vector3 pos = transform.position;
@@ -64,42 +58,33 @@ public class BlockMovement : MonoBehaviour
         float upDot = Mathf.Abs(Vector3.Dot(transform.up, Vector3.up));
         if (upDot > 0.9f)
         {
-            // De pie: solo ocupa una casilla (la posición central)
             int baseX = Mathf.RoundToInt(pos.x);
             int baseZ = Mathf.RoundToInt(pos.z);
             return new Vector2Int[] { new Vector2Int(baseX, baseZ) };
         }
         else
         {
-            // Acostado: ocupa dos casillas. La posición está centrada entre ambas (en x.5 o z.5)
             float rightUpDot = Mathf.Abs(Vector3.Dot(transform.right, Vector3.up));
             float forwardUpDot = Mathf.Abs(Vector3.Dot(transform.forward, Vector3.up));
 
             if (rightUpDot > 0.9f)
             {
-                // Acostado a lo largo de X: ocupar dos casillas en X
-                // pos.x está en x.5, las dos casillas son floor(x) y ceil(x)
                 int x1 = Mathf.FloorToInt(pos.x);
                 int x2 = Mathf.CeilToInt(pos.x);
-                // Si pos.x es exactamente un entero (raro pero posible), ajustar
                 if (x1 == x2) { x1 = x2 - 1; }
                 int baseZ = Mathf.RoundToInt(pos.z);
                 return new Vector2Int[] { new Vector2Int(x1, baseZ), new Vector2Int(x2, baseZ) };
             }
             else if (forwardUpDot > 0.9f)
             {
-                // Acostado a lo largo de Z: ocupar dos casillas en Z
-                // pos.z está en z.5, las dos casillas son floor(z) y ceil(z)
                 int baseX = Mathf.RoundToInt(pos.x);
                 int z1 = Mathf.FloorToInt(pos.z);
                 int z2 = Mathf.CeilToInt(pos.z);
-                // Si pos.z es exactamente un entero (raro pero posible), ajustar
                 if (z1 == z2) { z1 = z2 - 1; }
                 return new Vector2Int[] { new Vector2Int(baseX, z1), new Vector2Int(baseX, z2) };
             }
             else
             {
-                // Fallback: solo una casilla
                 int baseX = Mathf.RoundToInt(pos.x);
                 int baseZ = Mathf.RoundToInt(pos.z);
                 return new Vector2Int[] { new Vector2Int(baseX, baseZ) };
@@ -107,9 +92,6 @@ public class BlockMovement : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Verifica si el bloque está de pie (orientación vertical).
-    /// </summary>
     public bool IsUpright()
     {
         float upDot = Mathf.Abs(Vector3.Dot(transform.up, Vector3.up));
@@ -121,9 +103,7 @@ public class BlockMovement : MonoBehaviour
         mapCreation = FindFirstObjectByType<MapCreation>();
         groundMask = Physics.DefaultRaycastLayers;
 
-        // compute world-space size: prefer colliders on children, then renderers, else lossyScale
         scale = transform.lossyScale;
-        // compute combined bounds
         Bounds combined = new Bounds(transform.position, Vector3.zero);
         bool hasBounds = false;
         Collider[] cols = GetComponentsInChildren<Collider>();
@@ -155,20 +135,7 @@ public class BlockMovement : MonoBehaviour
         initialPosition = transform.position;
         initialRotation = transform.rotation;
         
-        if (showDebug)
-        {
-            Debug.Log("lossyScale: " + transform.lossyScale);
-            Debug.Log("Computed worldSize (bounds): " + worldSize);
-            Collider col = GetComponent<Collider>();
-            if (col != null)
-            {
-                Debug.Log("Root collider bounds size: " + col.bounds.size);
-            }
-            else
-            {
-                Debug.LogWarning("BlockMovement: No root Collider found to report bounds.");
-            }
-        }
+        
 
         Rigidbody rb = GetComponent<Rigidbody>();
         if (rb != null)
@@ -182,33 +149,16 @@ public class BlockMovement : MonoBehaviour
             Debug.LogWarning("BlockMovement: No Rigidbody found on " + gameObject.name);
         }
         
-        playerInput = GetComponent<PlayerInput>();
-        if (playerInput != null)
-        {
-            moveAction = playerInput.actions["Move"];
-            if (showDebug)
-                Debug.Log("Using PlayerInput component for input");
-        }
-        else
-        {
-            // Fallback: Try to find the action directly from the Input System
-            if (InputSystem.actions != null)
-            {
-                moveAction = InputSystem.actions.FindAction("Move");
-                if (moveAction != null && showDebug)
-                    Debug.Log("Using InputSystem.actions for input");
-            }
+        
+        
+        moveAction = playerInput.actions["Move"];
             
-            if (moveAction == null)
-            {
-                Debug.LogWarning("BlockMovement: No Move action found. Add a PlayerInput component or configure Input Actions.");
-            }
-        }
+        
+        
     }
 
     void Update()
     {
-        // Cheat keys: load level 0-9
         if (!isRotating)
         {
             if (Input.GetKeyDown(KeyCode.Alpha0)) mapCreation?.LoadLevel(0);
@@ -223,15 +173,12 @@ public class BlockMovement : MonoBehaviour
             else if (Input.GetKeyDown(KeyCode.Alpha9)) mapCreation?.LoadLevel(9);
         }
 
-        // Auto-reset if fallen too far
         if (transform.position.y < -8f)
         {
-            if (showDebug) Debug.Log("Block fell below threshold, triggering fail sequence");
             TriggerFall();
             return; // skip input this frame
         }
 
-        // Deterministic grounding check (no physics collisions needed)
         isGrounded = CheckGroundedByRaycast();
 
         if (!isRotating && isGrounded)
@@ -274,14 +221,12 @@ public class BlockMovement : MonoBehaviour
                 rotationTime = 0;
                 isRotating = true;
                 
-                // Disable colliders during movement to prevent getting stuck on edges (e.g. disabled bridges)
                 Collider[] cols = GetComponentsInChildren<Collider>();
                 foreach (var c in cols) c.enabled = false;
                 
                 PlayMoveSound();
                 
-                if (showDebug)
-                    Debug.Log("Starting move: direction=[" + directionX + ", " + directionZ + "]");
+               
             }
         }
     }
@@ -303,7 +248,6 @@ public class BlockMovement : MonoBehaviour
 
             if (ratio >= 1)
             {
-                // Snap to grid & correct height to avoid sinking into tiles
                 SnapToGrid();
 
                 isRotating = false;
@@ -311,15 +255,11 @@ public class BlockMovement : MonoBehaviour
                 directionZ = 0;
                 rotationTime = 0;
                 
-                // Re-enable colliders after movement
                 Collider[] cols = GetComponentsInChildren<Collider>();
                 foreach (var c in cols) c.enabled = true;
                 
-                // Re-evaluate grounding deterministically
                 isGrounded = CheckGroundedByRaycast();
 
-                if (showDebug)
-                    Debug.Log("Move complete. Position: " + transform.position);
             }
         }
     }
@@ -336,41 +276,41 @@ public class BlockMovement : MonoBehaviour
             dirVec = Vector3.forward;
 
         if (Mathf.Abs(Vector3.Dot(transform.right, dirVec)) > 0.99)
-        {                       // moving direction is the same as x of object
+        {                       
             if (Mathf.Abs(Vector3.Dot(transform.up, nomVec)) > 0.99)
-            {                   // y axis of global is the same as y of object
+            {                   
                 radius = Mathf.Sqrt(Mathf.Pow(worldSize.x / 2f, 2f) + Mathf.Pow(worldSize.y / 2f, 2f));
                 startAngleRad = Mathf.Atan2(worldSize.y, worldSize.x);
             }
             else if (Mathf.Abs(Vector3.Dot(transform.forward, nomVec)) > 0.99)
-            {       // y axis of global is the same as z of object
+            {       
                 radius = Mathf.Sqrt(Mathf.Pow(worldSize.x / 2f, 2f) + Mathf.Pow(worldSize.z / 2f, 2f));
                 startAngleRad = Mathf.Atan2(worldSize.z, worldSize.x);
             }
 
         }
         else if (Mathf.Abs(Vector3.Dot(transform.up, dirVec)) > 0.99)
-        {                   // moving direction is the same as y of object
+        {                   
             if (Mathf.Abs(Vector3.Dot(transform.right, nomVec)) > 0.99)
-            {                   // y of global is the same as x of object
+            {                   
                 radius = Mathf.Sqrt(Mathf.Pow(worldSize.y / 2f, 2f) + Mathf.Pow(worldSize.x / 2f, 2f));
                 startAngleRad = Mathf.Atan2(worldSize.x, worldSize.y);
             }
             else if (Mathf.Abs(Vector3.Dot(transform.forward, nomVec)) > 0.99)
-            {       // y axis of global is the same as z of object
+            {       
                 radius = Mathf.Sqrt(Mathf.Pow(worldSize.y / 2f, 2f) + Mathf.Pow(worldSize.z / 2f, 2f));
                 startAngleRad = Mathf.Atan2(worldSize.z, worldSize.y);
             }
         }
         else if (Mathf.Abs(Vector3.Dot(transform.forward, dirVec)) > 0.99)
-        {           // moving direction is the same as z of object
+        {           
             if (Mathf.Abs(Vector3.Dot(transform.right, nomVec)) > 0.99)
-            {                   // y of global is the same as x of object
+            {                   
                 radius = Mathf.Sqrt(Mathf.Pow(worldSize.z / 2f, 2f) + Mathf.Pow(worldSize.x / 2f, 2f));
                 startAngleRad = Mathf.Atan2(worldSize.x, worldSize.z);
             }
             else if (Mathf.Abs(Vector3.Dot(transform.up, nomVec)) > 0.99)
-            {               // y axis of global is the same as y of object
+            {               
                 radius = Mathf.Sqrt(Mathf.Pow(worldSize.z / 2f, 2f) + Mathf.Pow(worldSize.y / 2f, 2f));
                 startAngleRad = Mathf.Atan2(worldSize.y, worldSize.z);
             }
@@ -380,18 +320,14 @@ public class BlockMovement : MonoBehaviour
             Debug.Log("Radius calculated: " + radius + ", startAngle: " + startAngleRad);
     }
 
-    // Snap position and rotation to grid-aligned values and correct height based on orientation
     public void SnapToGrid()
     {
         Vector3 pos = transform.position;
-        // Tile top surface height
         float groundHeight = 0.25f + (0.07f / 2f);
 
-        // Snap X/Z to half-units to avoid 0.5 drift (covers standing and lying)
         pos.x = Mathf.Round(pos.x * 2f) / 2f;
         pos.z = Mathf.Round(pos.z * 2f) / 2f;
 
-        // Determine orientation by which local axis points up
         float upDot = Vector3.Dot(transform.up, Vector3.up);
         float rightUpDot = Mathf.Abs(Vector3.Dot(transform.right, Vector3.up));
         float forwardUpDot = Mathf.Abs(Vector3.Dot(transform.forward, Vector3.up));
@@ -414,23 +350,18 @@ public class BlockMovement : MonoBehaviour
 
         transform.position = pos;
 
-        // Snap rotation to nearest 90 degrees to avoid floating errors
         Vector3 euler = transform.eulerAngles;
         euler.x = Mathf.Round(euler.x / 90f) * 90f;
         euler.y = Mathf.Round(euler.y / 90f) * 90f;
         euler.z = Mathf.Round(euler.z / 90f) * 90f;
         transform.eulerAngles = euler;
 
-        // Check for win condition
         float upDotCheck = Vector3.Dot(transform.up, Vector3.up);
         
-        // Usar sistema lógico de cuadrícula en lugar de física
         Vector2Int[] occupied = GetOccupiedGridPositions();
         bool isUpright = IsUpright();
         GridManager.Instance?.CheckBlockPosition(occupied, isUpright);
 
-        // Mantener HandleFootContacts como respaldo/compatibilidad si es necesario
-        // HandleFootContacts(upDotCheck);
 
         if (showDebug) Debug.Log("Snapped to grid: " + transform.position + " rot=" + transform.eulerAngles);
     }
@@ -439,10 +370,9 @@ public class BlockMovement : MonoBehaviour
     {
         if (showDebug) Debug.Log("Breaking tile...");
         
-        // Optional: Play break sound
         // if (breakSound != null) AudioSource.PlayClipAtPoint(breakSound, transform.position);
 
-        yield return new WaitForSeconds(0.2f); // Wait a bit before breaking
+        yield return new WaitForSeconds(0.1f); 
         
         if (breakSound != null)
         {
@@ -459,7 +389,6 @@ public class BlockMovement : MonoBehaviour
             Destroy(tile);
         }
 
-        // Break surrounding breakable tiles in 3x3 area
         BreakSurroundingTiles(tile);
         
         // Force fall
@@ -503,7 +432,6 @@ public class BlockMovement : MonoBehaviour
         }
     }
 
-    // this method checks if the player hit the ground and enables the movement if it did
     void OnCollisionEnter(Collision theCollision)
     {
         if (!usePhysicsCollisions) return;
@@ -596,7 +524,6 @@ public class BlockMovement : MonoBehaviour
     private bool CheckGroundedByRaycast()
     {
         RaycastHit hit;
-        // Use a generous distance to cover lying orientations and map intro offsets
         if (Physics.Raycast(transform.position, Vector3.down, out hit, 3f, groundMask, QueryTriggerInteraction.Collide))
         {
             string n = hit.collider.name;
@@ -609,9 +536,7 @@ public class BlockMovement : MonoBehaviour
     }
 
 
-    /// <summary>
-    /// Plays a random movement sound from the array
-    /// </summary>
+ 
     private void PlayMoveSound()
     {
         MoveTracker.Instance?.RegisterMove();
@@ -629,9 +554,7 @@ public class BlockMovement : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Resets the block to its initial position and rotation, and clears velocity
-    /// </summary>
+
     private void ResetToStart()
     {
         if (mapCreation != null)
@@ -640,11 +563,10 @@ public class BlockMovement : MonoBehaviour
         }
         else
         {
-            // Fallback if no mapCreation found
             transform.position = initialPosition;
             transform.rotation = initialRotation;
             Rigidbody rb = GetComponent<Rigidbody>();
-            if (rb != null)
+            if (rb != null) //nunca se ejecuta pero por si acaso
             {
                 rb.linearVelocity = Vector3.zero;
                 rb.angularVelocity = Vector3.zero;
@@ -652,14 +574,12 @@ public class BlockMovement : MonoBehaviour
                 rb.isKinematic = true;
             }
             
-            // Reinitialize states
             isRotating = false;
             directionX = 0;
             directionZ = 0;
             rotationTime = 0;
             isGrounded = false;
             
-            // Ensure snapped correctly
             SnapToGrid();
         }
         

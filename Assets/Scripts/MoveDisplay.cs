@@ -20,7 +20,6 @@ public class MoveDisplay : MonoBehaviour
         gameObject.layer = 5; // UI layer
         SetupUI();
         
-        // Buscar o crear ScreenFader
         screenFader = FindFirstObjectByType<ScreenFader>();
         if (screenFader == null)
         {
@@ -29,7 +28,6 @@ public class MoveDisplay : MonoBehaviour
             DontDestroyOnLoad(fadeObj);
         }
         
-        // Suscribirse al evento de carga de escena para hacer fade out
         SceneManager.sceneLoaded += OnSceneLoaded;
     }
     
@@ -40,7 +38,6 @@ public class MoveDisplay : MonoBehaviour
     
     private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
-        // Si cargamos el menú, hacer fade out y resetear estado
         if (scene.name == menuSceneName)
         {
             isInMenu = true;
@@ -50,12 +47,10 @@ public class MoveDisplay : MonoBehaviour
                 screenFader.FadeTo(0f, 0.5f);
             }
             
-            // Desactivar completamente el gameObject en el menú para no interferir
             gameObject.SetActive(false);
         }
         else
         {
-            // En cualquier otra escena (nivel), mostrar el UI y hacer fade out
             isInMenu = false;
             menuLoading = false;
             if (screenFader != null)
@@ -63,7 +58,6 @@ public class MoveDisplay : MonoBehaviour
                 screenFader.FadeTo(0f, 0.5f);
             }
             
-            // Reactivar el gameObject en niveles
             gameObject.SetActive(true);
         }
     }
@@ -139,7 +133,7 @@ public class MoveDisplay : MonoBehaviour
                 textTransform.gameObject.AddComponent<CanvasRenderer>();
         }
 
-        moveText.raycastTarget = false; // allow clicks to pass through text
+        moveText.raycastTarget = false; 
 
         moveText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
         moveText.fontSize = 22;
@@ -149,7 +143,7 @@ public class MoveDisplay : MonoBehaviour
         rt.anchorMax = new Vector2(0f, 1f);
         rt.pivot = new Vector2(0f, 1f);
         rt.anchoredPosition = new Vector2(14f, -14f);
-        rt.sizeDelta = new Vector2(200f, 60f); // Reducido de 360f a 200f para evitar solapamientos
+        rt.sizeDelta = new Vector2(200f, 60f); 
         moveText.color = Color.white;
     }
 
@@ -165,7 +159,7 @@ public class MoveDisplay : MonoBehaviour
             if (buttonObj.GetComponent<CanvasRenderer>() == null)
                 buttonObj.AddComponent<CanvasRenderer>();
             Image img = buttonObj.AddComponent<Image>();
-            img.color = Color.white; // Blanco para que ColorBlock module correctamente
+            img.color = Color.white; 
             menuButton = buttonObj.AddComponent<Button>();
             menuButton.targetGraphic = img;
         }
@@ -184,7 +178,7 @@ public class MoveDisplay : MonoBehaviour
                 {
                     graphic = buttonTransform.gameObject.AddComponent<Image>();
                 }
-                graphic.color = Color.white; // Blanco para que ColorBlock module correctamente
+                graphic.color = Color.white; 
                 menuButton.targetGraphic = graphic;
             }
         }
@@ -199,14 +193,12 @@ public class MoveDisplay : MonoBehaviour
         // Ensure button is on UI layer for raycasts
         menuButton.gameObject.layer = 5;
         
-        // Asegurar que el Image tiene raycastTarget activado
         Image buttonImage = menuButton.GetComponent<Image>();
         if (buttonImage != null)
         {
             buttonImage.raycastTarget = true;
         }
         
-        // Configurar ColorBlock para que el botón sea visible
         ColorBlock colors = menuButton.colors;
         colors.normalColor = new Color(0.3f, 0.3f, 0.3f, 0.8f);
         colors.highlightedColor = new Color(0.5f, 0.5f, 0.5f, 0.8f);
@@ -295,7 +287,6 @@ public class MoveDisplay : MonoBehaviour
         int moves = MoveTracker.Instance != null ? MoveTracker.Instance.DisplayTotalMoves : 0;
         moveText.text = $"Movimientos: {moves}";
         
-        // Detectar tecla ESC para volver al menú - SOLO en niveles, no en menú
         if (Input.GetKeyDown(KeyCode.Escape) && !menuLoading && !isInMenu)
         {
             HandleMenuButton();

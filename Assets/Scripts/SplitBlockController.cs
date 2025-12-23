@@ -1,8 +1,6 @@
 using UnityEngine;
 
-/// <summary>
-/// Controlador para dividir el bloque principal en dos cubos individuales y alternar el control entre ellos.
-/// </summary>
+
 public class SplitBlockController : MonoBehaviour
 {
     [Header("Prefabs de cubos individuales")]
@@ -79,7 +77,6 @@ public class SplitBlockController : MonoBehaviour
         movementB = blockB.GetComponent<SingleCubeMovement>();
         SetActiveBlock(0);
 
-        // Registrar los single cubes en el GridManager
         GridManager.Instance?.SetSplitCubes(movementA, movementB);
 
         Debug.Log($"[SplitBlockController] Split complete. BlockA: {blockA.name}, BlockB: {blockB.name}");
@@ -158,11 +155,9 @@ public class SplitBlockController : MonoBehaviour
         }
         else
         {
-            // Fallback: identidad (de pie)
             transform.rotation = Quaternion.identity;
         }
         
-        // Limpiar velocidades
         Rigidbody rb = GetComponent<Rigidbody>();
         if (rb != null)
         {
@@ -172,17 +167,14 @@ public class SplitBlockController : MonoBehaviour
         
         ResetSplitState();
 
-        // Usar SnapToGrid del BlockMovement para alinear correctamente
         BlockMovement mainBM = GetComponent<BlockMovement>();
         if (mainBM != null)
         {
             mainBM.enabled = true;
-            // Llamar directamente a SnapToGrid para alinear correctamente
             mainBM.SnapToGrid();
             GridManager.Instance?.SetMainBlock(mainBM);
         }
         
-        // Limpiar split cubes en GridManager
         GridManager.Instance?.ClearSplitCubes();
     }
 

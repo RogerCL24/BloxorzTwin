@@ -108,7 +108,7 @@ public class OceanGenerator : MonoBehaviour
             // Combine multiple Perlin noise layers for more natural waves
             float y = Mathf.PerlinNoise((v.x + time) * waveScale, (v.z + time) * waveScale) * waveHeight;
             y += Mathf.PerlinNoise((v.x - time) * waveScale * 2f, (v.z - time * 0.5f) * waveScale * 2f) * waveHeight * 0.3f;
-            y += Mathf.Sin(time + v.x * 0.5f) * 0.2f; // Add some rolling swell
+            y += Mathf.Sin(time + v.x * 0.5f) * 0.2f; 
 
             vertices[i].y = y;
         }

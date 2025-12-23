@@ -5,14 +5,12 @@ public class BridgeTile : MonoBehaviour
 {
     private bool isActive = false;
     private Vector3 targetPosition;
-    private Vector3 startPosition; // For deploy-from-below animation
+    private Vector3 startPosition;
     private Coroutine currentAnim;
 
     void Awake()
     {
         targetPosition = transform.position;
-        // Default start position: try to find a nearby "normal" tile and start from underneath it.
-        // We'll search for nearby colliders and pick the closest that is not this BridgeTile.
         Collider[] hits = Physics.OverlapSphere(transform.position, 1.5f);
         Vector3 found = Vector3.zero;
         float bestDist = float.MaxValue;
@@ -30,13 +28,11 @@ public class BridgeTile : MonoBehaviour
         }
         if (bestDist < float.MaxValue)
         {
-            // start a bit below the found tile
-            startPosition = new Vector3(found.x, targetPosition.y - 1.0f, found.z);
+            startPosition = new Vector3(found.x, targetPosition.y - 0.5f, found.z);
         }
         else
         {
-            // fallback: start slightly below target
-            startPosition = targetPosition + Vector3.down * 1.0f;
+            startPosition = targetPosition + Vector3.down * 0.5f;
         }
     }
 
@@ -44,7 +40,6 @@ public class BridgeTile : MonoBehaviour
     {
         isActive = active;
 
-        // Stop any running animation
         if (currentAnim != null)
         {
             StopCoroutine(currentAnim);
@@ -56,7 +51,6 @@ public class BridgeTile : MonoBehaviour
 
         if (active)
         {
-            // show visuals but keep colliders disabled until fully deployed
             foreach (var r in renderers) r.enabled = true;
             foreach (var c in colliders) c.enabled = false;
 
@@ -73,7 +67,6 @@ public class BridgeTile : MonoBehaviour
         }
         else
         {
-            // deactivate: disable colliders immediately so player can fall through
             foreach (var c in colliders) c.enabled = false;
             if (immediate)
             {
@@ -107,7 +100,6 @@ public class BridgeTile : MonoBehaviour
         }
 
         transform.position = targetPosition;
-        // enable colliders at the end
         foreach (var c in colliders) c.enabled = true;
         currentAnim = null;
     }
@@ -129,7 +121,6 @@ public class BridgeTile : MonoBehaviour
         }
 
         transform.position = to;
-        // hide visuals at end
         foreach (var r in renderers) r.enabled = false;
         currentAnim = null;
     }

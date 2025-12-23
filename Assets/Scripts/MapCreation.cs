@@ -4,28 +4,26 @@ using System.Collections.Generic;
 using UnityEngine;
 
 
-// MapCreation instances multiple copies of a tile prefab to build a level
-// following the contents of a map file
 
 
 public class MapCreation : MonoBehaviour
 {
-    public TextAsset[] maps; 		// Text files containing the maps
+    public TextAsset[] maps; 		
     public int currentLevel = 0;
-    public GameObject tile, bridge, cross, divisor, final; 	// Tile prefab used to instance and build the level
+    public GameObject tile, bridge, cross, divisor, final; 	
     [Header("Divisor Prefabs")]
     public GameObject singleBlockPrefabA;
     public GameObject singleBlockPrefabB;
-    public GameObject[] breakables; // Array of breakable tile prefabs
-    public GameObject bridgeTile; // New bridge tile prefab
-    public GlobalAudio globalAudio; // Reference to global audio (optional, auto-found)
-    public ScreenFader screenFader; // Optional fade controller (auto-created if null)
+    public GameObject[] breakables; 
+    public GameObject bridgeTile; 
+    public GlobalAudio globalAudio; 
+    public ScreenFader screenFader; 
     [Header("Physics")]
     public bool overrideGravity = true;
     public Vector3 gravityOverride = new Vector3(0, -8f, 0);
-    //cross, divisor, breakable
+   
     
-    private PlayerSpawner playerSpawner; // Reference to the PlayerSpawner component
+    private PlayerSpawner playerSpawner; 
     private Dictionary<Vector2Int, GameObject> levelTiles = new Dictionary<Vector2Int, GameObject>();
 
     private int mapHeight;
@@ -37,17 +35,14 @@ public class MapCreation : MonoBehaviour
     private float playerLiftHeight = 30f;
     private float playerDropHeight = 5f;
 
-    // Start is called once after the MonoBehaviour is created
     void Start()
     {
-        // Get the PlayerSpawner component from this GameObject
         playerSpawner = GetComponent<PlayerSpawner>();
 
         if (globalAudio == null)
             globalAudio = FindFirstObjectByType<GlobalAudio>();
         if (globalAudio == null)
         {
-            // Auto-create a global audio manager if none exists
             GameObject audioObj = new GameObject("GlobalAudio");
             globalAudio = audioObj.AddComponent<GlobalAudio>();
         }
@@ -97,20 +92,7 @@ public class MapCreation : MonoBehaviour
             LoadLevel(currentLevel);
         }
 
-        if (Input.GetMouseButtonDown(0))
-        {
-            Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
-            if (Physics.Raycast(ray, out RaycastHit hit))
-            {
-                Vector3 pos = hit.transform.position;
-                int x = Mathf.RoundToInt(pos.x);
-                int z = Mathf.RoundToInt(pos.z);
-                int row = mapHeight - 1 - z;
-                Vector3 relative = new Vector3(x, 0, z) - new Vector3(startPlayerPos.x, 0, startPlayerPos.z);
-
-                Debug.Log($"[DEBUG] Object: {hit.transform.name} | Unity Pos: ({x}, {z}) | Map Coord (Col, Row): ({x}, {row}) | Rel to Start: ({relative.x}, {relative.z})");
-            }
-        }
+        
     }
 
     public void LoadLevel(int levelIndex, bool skipFade = false)
@@ -255,7 +237,6 @@ public class MapCreation : MonoBehaviour
 
                     introTiles.Add((instance.transform, pos));
 
-                    // Registrar el tile en el GridManager
                     TileType gridTileType = TileType.Normal;
                     if (tileChar == 'F')
                     {
@@ -287,7 +268,6 @@ public class MapCreation : MonoBehaviour
                     {
                         instance.name = "DivisorButton";
                         gridTileType = TileType.DivisorButton;
-                        // Ensure the divisor button has a collider for raycast detection
                         if (instance.GetComponent<Collider>() == null)
                         {
                             BoxCollider bc = instance.AddComponent<BoxCollider>();
@@ -299,18 +279,15 @@ public class MapCreation : MonoBehaviour
                     {
                         if (instance.GetComponent<BridgeTile>() == null)
                             instance.AddComponent<BridgeTile>();
-                        // Default disabled
                         instance.GetComponent<BridgeTile>().SetState(false, true);
                         gridTileType = TileType.BridgeTile;
                     }
 
-                    // Registrar el tile en el GridManager con su tipo
                     GridManager.Instance?.RegisterTile(new Vector2Int(x, z), gridTileType, instance);
                 }
             }
         }
         
-        // Parse Config Lines
         foreach (var line in configLines)
         {
             string[] parts = line.Split(';');
@@ -324,10 +301,8 @@ public class MapCreation : MonoBehaviour
             
             if (levelTiles.TryGetValue(new Vector2Int(bx, bz), out GameObject btnObj))
             {
-                // Check if it's a DivisorButton or a BridgeButton/CrossButton
                 if (btnObj.name == "DivisorButton")
                 {
-                    // For divisor buttons, expect exactly 2 coordinate pairs for split positions
                     if (parts.Length >= 3)
                     {
                         string[] posACoords = parts[1].Split(',');
@@ -347,7 +322,6 @@ public class MapCreation : MonoBehaviour
                             
                             Debug.Log($"[DivisorButton Parsed] A: axPos={axPos}, aRowPos={aRowPos}, azPos={azPos} | B: bxPos={bxPos}, bRowPos={bRowPos}, bzPos={bzPos}");
                             
-                            // Store split positions in the button GameObject for later retrieval
                             DivisorButtonData dbData = btnObj.GetComponent<DivisorButtonData>();
                             if (dbData == null)
                                 dbData = btnObj.AddComponent<DivisorButtonData>();
@@ -361,12 +335,10 @@ public class MapCreation : MonoBehaviour
                 }
                 else
                 {
-                    // BridgeButton or CrossButton
                     ButtonController ctrl = btnObj.GetComponent<ButtonController>();
                     if (ctrl != null)
                     {
-                        // Detect optional mode token immediately after button coords
-                        int startIndex = 1; // default: parts[1] is a tile coord
+                        int startIndex = 1; 
                         if (parts.Length > 1)
                         {
                             string token = parts[1].Trim();
@@ -492,7 +464,6 @@ public class MapCreation : MonoBehaviour
 
         player.transform.position = startPos;
 
-        // Assign split block prefabs to SplitBlockController
         SplitBlockController splitCtrl = player.GetComponent<SplitBlockController>();
         if (splitCtrl != null)
         {
@@ -509,7 +480,6 @@ public class MapCreation : MonoBehaviour
 
         player.SetActive(true);
 
-        // Registrar el bloque principal en el GridManager
         BlockMovement blockMovement = player.GetComponent<BlockMovement>();
         if (blockMovement != null)
         {
@@ -583,28 +553,21 @@ public class MapCreation : MonoBehaviour
 
         MoveTracker.Instance?.CompleteLevel();
 
-        // Play map change sound
         if (globalAudio != null)
             globalAudio.PlayMapChange();
 
-        // Rise and spin tiles for a dramatic exit
         RiseTilesUpSpin();
 
-        // Give some time for the drop to be visible
         yield return new WaitForSeconds(0.8f);
 
-        // Fade to black
         if (screenFader != null)
             yield return screenFader.FadeTo(1f, 0.6f);
 
-        // Small pause in black
         yield return new WaitForSeconds(0.3f);
 
-        // Advance level
         currentLevel++;
         LoadLevel(currentLevel);
 
-        // Fade back in
         if (screenFader != null)
             yield return screenFader.FadeTo(0f, 0.6f);
 
@@ -615,30 +578,22 @@ public class MapCreation : MonoBehaviour
     {
         levelTransitionRunning = true;
 
-        // Drop tiles downward to show failure
         DropTilesDown();
 
-        // Play game fail sound
         if (globalAudio != null)
             globalAudio.PlayGameFail();
 
-        // short delay to show fall
         yield return new WaitForSeconds(0.8f);
 
-        // Fade to black (quick)
         if (screenFader != null)
             yield return screenFader.FadeTo(1f, 0.4f);
 
-        // Give player a breath before level reload
         yield return new WaitForSeconds(2f);
 
-        // Reload current level without duplicating the fade that already ran above
         LoadLevel(currentLevel, true);
 
-        // Wait until the new map is fully built before fading back in
         yield return new WaitUntil(() => introCompleted);
 
-        // Fade back in
         if (screenFader != null)
             yield return screenFader.FadeTo(0f, 0.4f);
 
@@ -681,10 +636,8 @@ public class MapCreation : MonoBehaviour
     {
         if (Camera.main == null) return;
 
-        // Calculate the center of the map
         Vector3 mapCenter = new Vector3((sizeX - 1) / 2.0f, 0, (sizeZ - 1) / 2.0f);
 
-        // Find the point on the ground (y=0) that the camera is currently looking at
         Ray ray = Camera.main.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0));
         Plane groundPlane = new Plane(Vector3.up, Vector3.zero);
 
@@ -693,7 +646,6 @@ public class MapCreation : MonoBehaviour
             Vector3 currentLookAt = ray.GetPoint(distance);
             Vector3 offset = mapCenter - currentLookAt;
             
-            // Move the camera by the offset to center it on the map
             Camera.main.transform.position += offset;
         }
     }

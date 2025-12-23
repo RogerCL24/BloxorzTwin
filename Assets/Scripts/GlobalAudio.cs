@@ -1,6 +1,5 @@
 using UnityEngine;
 
-// Simple global audio manager. Add once in the scene (or it will auto-create itself).
 public class GlobalAudio : MonoBehaviour
 {
     public static GlobalAudio Instance { get; private set; }

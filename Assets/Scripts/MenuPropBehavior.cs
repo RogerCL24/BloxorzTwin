@@ -2,11 +2,11 @@ using UnityEngine;
 
 public class MenuPropBehavior : MonoBehaviour
 {
-    [Header("Rotación (Giro Peonza)")]
+    [Header("Rotaciï¿½n (Giro Peonza)")]
     public float rotSpeed = 20f; // Velocidad de giro en el eje Y (Horizontal)
 
-    [Header("Balanceo (Inclinación)")]
-    public float tiltStrength = 0f; // Pon esto a 0 si no quieres que gire hacia delante/atrás
+    [Header("Balanceo (Inclinaciï¿½n)")]
+    public float tiltStrength = 0f; // Pon esto a 0 si no quieres que gire hacia delante/atrï¿½s
 
     [Header("Movimiento por la Pantalla")]
     public float moveSpeed = 0.5f; // Velocidad del viaje
@@ -22,16 +22,11 @@ public class MenuPropBehavior : MonoBehaviour
 
     void Update()
     {
-        // 1. Rotación constante (Giro Y - Peonza)
         transform.Rotate(Vector3.up * rotSpeed * Time.deltaTime, Space.World);
 
-        // 2. Balanceo Suave (Giro X - Hacia delante/atrás)
-        // He cambiado la lógica para que no sea acumulativa (no da vueltas completas, solo se mece)
         float tilt = Mathf.Sin(Time.time * moveSpeed) * tiltStrength;
-        // Aplicamos la rotación local en X
         transform.localRotation = Quaternion.Euler(tilt, transform.localEulerAngles.y, transform.localEulerAngles.z);
 
-        // 3. Movimiento Amplio (Flotar por la pantalla)
         float x = Mathf.Sin(Time.time * moveSpeed) * widthDistance;
         float y = Mathf.Cos(Time.time * moveSpeed * 0.8f) * heightDistance;
 
