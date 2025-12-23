@@ -1,8 +1,7 @@
+using System.Collections;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.EventSystems;
-using UnityEngine.InputSystem;
-using UnityEngine.InputSystem.UI;
 using UnityEngine.UI;
 
 public class MoveDisplay : MonoBehaviour
@@ -12,11 +11,61 @@ public class MoveDisplay : MonoBehaviour
     private Text moveText;
     private Button menuButton;
     private bool menuLoading;
+    private bool isInMenu = false;
+    private ScreenFader screenFader;
 
     private void Awake()
     {
         DontDestroyOnLoad(gameObject);
+        gameObject.layer = 5; // UI layer
         SetupUI();
+        
+        // Buscar o crear ScreenFader
+        screenFader = FindFirstObjectByType<ScreenFader>();
+        if (screenFader == null)
+        {
+            GameObject fadeObj = new GameObject("ScreenFader");
+            screenFader = fadeObj.AddComponent<ScreenFader>();
+            DontDestroyOnLoad(fadeObj);
+        }
+        
+        // Suscribirse al evento de carga de escena para hacer fade out
+        SceneManager.sceneLoaded += OnSceneLoaded;
+    }
+    
+    private void OnDestroy()
+    {
+        SceneManager.sceneLoaded -= OnSceneLoaded;
+    }
+    
+    private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+    {
+        // Si cargamos el menú, hacer fade out y resetear estado
+        if (scene.name == menuSceneName)
+        {
+            isInMenu = true;
+            menuLoading = false;
+            if (screenFader != null)
+            {
+                screenFader.FadeTo(0f, 0.5f);
+            }
+            
+            // Desactivar completamente el gameObject en el menú para no interferir
+            gameObject.SetActive(false);
+        }
+        else
+        {
+            // En cualquier otra escena (nivel), mostrar el UI y hacer fade out
+            isInMenu = false;
+            menuLoading = false;
+            if (screenFader != null)
+            {
+                screenFader.FadeTo(0f, 0.5f);
+            }
+            
+            // Reactivar el gameObject en niveles
+            gameObject.SetActive(true);
+        }
     }
 
     private void SetupUI()
@@ -54,29 +103,16 @@ public class MoveDisplay : MonoBehaviour
         EventSystem existing = EventSystem.current;
         if (existing != null)
         {
-            // Ensure it has an InputSystem module if the project uses the new Input System.
-            if (existing.GetComponent<InputSystemUIInputModule>() == null && InputSystem.settings != null)
+            if (existing.GetComponent<StandaloneInputModule>() == null)
             {
-                var legacy = existing.GetComponent<StandaloneInputModule>();
-                if (legacy != null)
-                {
-                    Destroy(legacy);
-                }
-                existing.gameObject.AddComponent<InputSystemUIInputModule>();
+                existing.gameObject.AddComponent<StandaloneInputModule>();
             }
             return;
         }
 
         GameObject es = new GameObject("EventSystem");
         es.AddComponent<EventSystem>();
-        if (InputSystem.settings != null)
-        {
-            es.AddComponent<InputSystemUIInputModule>();
-        }
-        else
-        {
-            es.AddComponent<StandaloneInputModule>();
-        }
+        es.AddComponent<StandaloneInputModule>();
     }
 
     private void SetupMoveText()
@@ -86,6 +122,10 @@ public class MoveDisplay : MonoBehaviour
         {
             GameObject textObj = new GameObject("MoveText");
             textObj.transform.SetParent(transform, false);
+            if (textObj.GetComponent<RectTransform>() == null)
+                textObj.AddComponent<RectTransform>();
+            if (textObj.GetComponent<CanvasRenderer>() == null)
+                textObj.AddComponent<CanvasRenderer>();
             moveText = textObj.AddComponent<Text>();
         }
         else
@@ -95,7 +135,11 @@ public class MoveDisplay : MonoBehaviour
             {
                 moveText = textTransform.gameObject.AddComponent<Text>();
             }
+            if (textTransform.GetComponent<CanvasRenderer>() == null)
+                textTransform.gameObject.AddComponent<CanvasRenderer>();
         }
+
+        moveText.raycastTarget = false; // allow clicks to pass through text
 
         moveText.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
         moveText.fontSize = 22;
@@ -105,7 +149,7 @@ public class MoveDisplay : MonoBehaviour
         rt.anchorMax = new Vector2(0f, 1f);
         rt.pivot = new Vector2(0f, 1f);
         rt.anchoredPosition = new Vector2(14f, -14f);
-        rt.sizeDelta = new Vector2(360f, 60f);
+        rt.sizeDelta = new Vector2(200f, 60f); // Reducido de 360f a 200f para evitar solapamientos
         moveText.color = Color.white;
     }
 
@@ -116,9 +160,14 @@ public class MoveDisplay : MonoBehaviour
         {
             GameObject buttonObj = new GameObject("MenuButton");
             buttonObj.transform.SetParent(transform, false);
+            if (buttonObj.GetComponent<RectTransform>() == null)
+                buttonObj.AddComponent<RectTransform>();
+            if (buttonObj.GetComponent<CanvasRenderer>() == null)
+                buttonObj.AddComponent<CanvasRenderer>();
             Image img = buttonObj.AddComponent<Image>();
-            img.color = new Color(0.1f, 0.1f, 0.1f, 0.78f);
+            img.color = Color.white; // Blanco para que ColorBlock module correctamente
             menuButton = buttonObj.AddComponent<Button>();
+            menuButton.targetGraphic = img;
         }
         else
         {
@@ -135,7 +184,7 @@ public class MoveDisplay : MonoBehaviour
                 {
                     graphic = buttonTransform.gameObject.AddComponent<Image>();
                 }
-                graphic.color = new Color(0.1f, 0.1f, 0.1f, 0.78f);
+                graphic.color = Color.white; // Blanco para que ColorBlock module correctamente
                 menuButton.targetGraphic = graphic;
             }
         }
@@ -147,12 +196,34 @@ public class MoveDisplay : MonoBehaviour
         rt.anchoredPosition = new Vector2(-20f, -20f);
         rt.sizeDelta = new Vector2(170f, 52f);
 
+        // Ensure button is on UI layer for raycasts
+        menuButton.gameObject.layer = 5;
+        
+        // Asegurar que el Image tiene raycastTarget activado
+        Image buttonImage = menuButton.GetComponent<Image>();
+        if (buttonImage != null)
+        {
+            buttonImage.raycastTarget = true;
+        }
+        
+        // Configurar ColorBlock para que el botón sea visible
+        ColorBlock colors = menuButton.colors;
+        colors.normalColor = new Color(0.3f, 0.3f, 0.3f, 0.8f);
+        colors.highlightedColor = new Color(0.5f, 0.5f, 0.5f, 0.8f);
+        colors.pressedColor = new Color(0.2f, 0.2f, 0.2f, 0.8f);
+        colors.disabledColor = new Color(0.5f, 0.5f, 0.5f, 0.3f);
+        menuButton.colors = colors;
+
         Transform labelTransform = menuButton.transform.Find("Text");
         Text label;
         if (labelTransform == null)
         {
             GameObject labelObj = new GameObject("Text");
             labelObj.transform.SetParent(menuButton.transform, false);
+            if (labelObj.GetComponent<RectTransform>() == null)
+                labelObj.AddComponent<RectTransform>();
+            if (labelObj.GetComponent<CanvasRenderer>() == null)
+                labelObj.AddComponent<CanvasRenderer>();
             label = labelObj.AddComponent<Text>();
         }
         else
@@ -162,6 +233,8 @@ public class MoveDisplay : MonoBehaviour
             {
                 label = labelTransform.gameObject.AddComponent<Text>();
             }
+            if (labelTransform.GetComponent<CanvasRenderer>() == null)
+                labelTransform.gameObject.AddComponent<CanvasRenderer>();
         }
 
         label.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
@@ -194,6 +267,20 @@ public class MoveDisplay : MonoBehaviour
         {
             menuButton.interactable = false;
         }
+        
+        StartCoroutine(FadeAndLoadMenu());
+    }
+    
+    private IEnumerator FadeAndLoadMenu()
+    {
+        if (screenFader != null)
+        {
+            yield return screenFader.FadeTo(1f, 0.5f);
+        }
+        else
+        {
+            yield return new WaitForSeconds(0.2f);
+        }
 
         SceneManager.LoadScene(menuSceneName);
     }
@@ -207,5 +294,11 @@ public class MoveDisplay : MonoBehaviour
 
         int moves = MoveTracker.Instance != null ? MoveTracker.Instance.DisplayTotalMoves : 0;
         moveText.text = $"Movimientos: {moves}";
+        
+        // Detectar tecla ESC para volver al menú - SOLO en niveles, no en menú
+        if (Input.GetKeyDown(KeyCode.Escape) && !menuLoading && !isInMenu)
+        {
+            HandleMenuButton();
+        }
     }
 }

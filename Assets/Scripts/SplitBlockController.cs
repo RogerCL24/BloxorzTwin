@@ -79,6 +79,9 @@ public class SplitBlockController : MonoBehaviour
         movementB = blockB.GetComponent<SingleCubeMovement>();
         SetActiveBlock(0);
 
+        // Registrar los single cubes en el GridManager
+        GridManager.Instance?.SetSplitCubes(movementA, movementB);
+
         Debug.Log($"[SplitBlockController] Split complete. BlockA: {blockA.name}, BlockB: {blockB.name}");
     }
 
@@ -118,22 +121,69 @@ public class SplitBlockController : MonoBehaviour
     void MergeBlocks()
     {
         Vector2 centerGrid = Vector2.zero;
+        Vector2 posA = Vector2.zero;
+        Vector2 posB = Vector2.zero;
+        
         if (movementA != null && movementB != null)
         {
-            centerGrid = ((Vector2)movementA.GridPosition + (Vector2)movementB.GridPosition) / 2f;
+            posA = movementA.GridPosition;
+            posB = movementB.GridPosition;
+            centerGrid = (posA + posB) / 2f;
         }
         else
         {
-            centerGrid = new Vector2((splitPositionA.x + splitPositionB.x) / 2f, (splitPositionA.z + splitPositionB.z) / 2f);
+            posA = new Vector2(splitPositionA.x, splitPositionA.z);
+            posB = new Vector2(splitPositionB.x, splitPositionB.z);
+            centerGrid = (posA + posB) / 2f;
         }
 
         DestroySplitCubes();
-
-        Vector3 mergePosition = new Vector3(centerGrid.x, mergeHeight, centerGrid.y);
-        transform.position = mergePosition;
-
         ShowMainBlock();
+        
+        // Posicionar el bloque en el centro
+        Vector3 mergePos = new Vector3(centerGrid.x, transform.position.y, centerGrid.y);
+        transform.position = mergePos;
+        
+        // Determinar orientación: el bloque debe estar tumbado en la dirección de los cubos
+        Vector2 diff = posB - posA;
+        if (Mathf.Abs(diff.x) > 0.1f)
+        {
+            // Horizontal en X (tumbado en eje X)
+            transform.rotation = Quaternion.Euler(0, 0, 90);
+        }
+        else if (Mathf.Abs(diff.y) > 0.1f)
+        {
+            // Horizontal en Z (tumbado en eje Z)
+            transform.rotation = Quaternion.Euler(90, 0, 0);
+        }
+        else
+        {
+            // Fallback: identidad (de pie)
+            transform.rotation = Quaternion.identity;
+        }
+        
+        // Limpiar velocidades
+        Rigidbody rb = GetComponent<Rigidbody>();
+        if (rb != null)
+        {
+            rb.linearVelocity = Vector3.zero;
+            rb.angularVelocity = Vector3.zero;
+        }
+        
         ResetSplitState();
+
+        // Usar SnapToGrid del BlockMovement para alinear correctamente
+        BlockMovement mainBM = GetComponent<BlockMovement>();
+        if (mainBM != null)
+        {
+            mainBM.enabled = true;
+            // Llamar directamente a SnapToGrid para alinear correctamente
+            mainBM.SnapToGrid();
+            GridManager.Instance?.SetMainBlock(mainBM);
+        }
+        
+        // Limpiar split cubes en GridManager
+        GridManager.Instance?.ClearSplitCubes();
     }
 
     private void HideMainBlock()
@@ -173,6 +223,12 @@ public class SplitBlockController : MonoBehaviour
         DestroySplitCubes();
         ShowMainBlock();
         ResetSplitState();
-        mergeHeight = transform.position.y;
+        Collider col = GetComponent<Collider>();
+        float groundHeight = 0.25f + 0.07f * 0.5f;
+        float halfHeight = col != null ? col.bounds.extents.y : 1f;
+        mergeHeight = halfHeight + groundHeight;
+        Vector3 pos = transform.position;
+        pos.y = mergeHeight;
+        transform.position = pos;
     }
 }

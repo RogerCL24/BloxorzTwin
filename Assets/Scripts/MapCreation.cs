@@ -81,6 +81,12 @@ public class MapCreation : MonoBehaviour
             GameObject displayObj = new GameObject("MoveDisplayUI");
             displayObj.AddComponent<MoveDisplay>();
         }
+
+        if (GridManager.Instance == null)
+        {
+            GameObject gridObj = new GameObject("GridManager");
+            gridObj.AddComponent<GridManager>();
+        }
     }
 
     void Update()
@@ -169,6 +175,7 @@ public class MapCreation : MonoBehaviour
             Destroy(child.gameObject);
         }
         levelTiles.Clear();
+        GridManager.Instance?.ClearGrid();
 
         TextAsset map = maps[levelIndex];
         string[] allLines = map.text.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
@@ -248,31 +255,38 @@ public class MapCreation : MonoBehaviour
 
                     introTiles.Add((instance.transform, pos));
 
+                    // Registrar el tile en el GridManager
+                    TileType gridTileType = TileType.Normal;
                     if (tileChar == 'F')
                     {
                         instance.tag = "Finish";
+                        gridTileType = TileType.Finish;
                     }
                     else if (tileChar == 'B')
                     {
                         instance.tag = "Orange";
                         if (instance.GetComponent<BreakableTile>() == null)
                             instance.AddComponent<BreakableTile>();
+                        gridTileType = TileType.Orange;
                     }
                     else if (tileChar == 'H')
                     {
                         instance.name = "BridgeButton";
                         if (instance.GetComponent<ButtonController>() == null)
                             instance.AddComponent<ButtonController>();
+                        gridTileType = TileType.BridgeButton;
                     }
                     else if (tileChar == 'X')
                     {
                         instance.name = "CrossButton";
                         if (instance.GetComponent<ButtonController>() == null)
                             instance.AddComponent<ButtonController>();
+                        gridTileType = TileType.CrossButton;
                     }
                     else if (tileChar == 'D')
                     {
                         instance.name = "DivisorButton";
+                        gridTileType = TileType.DivisorButton;
                         // Ensure the divisor button has a collider for raycast detection
                         if (instance.GetComponent<Collider>() == null)
                         {
@@ -287,7 +301,11 @@ public class MapCreation : MonoBehaviour
                             instance.AddComponent<BridgeTile>();
                         // Default disabled
                         instance.GetComponent<BridgeTile>().SetState(false, true);
+                        gridTileType = TileType.BridgeTile;
                     }
+
+                    // Registrar el tile en el GridManager con su tipo
+                    GridManager.Instance?.RegisterTile(new Vector2Int(x, z), gridTileType, instance);
                 }
             }
         }
@@ -450,7 +468,9 @@ public class MapCreation : MonoBehaviour
 
         if (player == null) return;
 
-        player.transform.position = new Vector3(0, playerLiftHeight, 0);
+        // Move the player far from camera while tiles spawn to avoid floating in view
+        Vector3 hiddenPos = new Vector3(10000f, -10000f, 10000f);
+        player.transform.position = hiddenPos;
         player.GetComponent<SplitBlockController>()?.ResetToMainBlock();
         Rigidbody rb = player.GetComponent<Rigidbody>();
         if (rb != null)
@@ -470,6 +490,8 @@ public class MapCreation : MonoBehaviour
         GameObject player = playerSpawner.SpawnPlayer(startPos);
         if (player == null) return;
 
+        player.transform.position = startPos;
+
         // Assign split block prefabs to SplitBlockController
         SplitBlockController splitCtrl = player.GetComponent<SplitBlockController>();
         if (splitCtrl != null)
@@ -483,6 +505,15 @@ public class MapCreation : MonoBehaviour
         {
             rb.useGravity = true;
             rb.isKinematic = false;
+        }
+
+        player.SetActive(true);
+
+        // Registrar el bloque principal en el GridManager
+        BlockMovement blockMovement = player.GetComponent<BlockMovement>();
+        if (blockMovement != null)
+        {
+            GridManager.Instance?.SetMainBlock(blockMovement);
         }
     }
 
@@ -586,6 +617,10 @@ public class MapCreation : MonoBehaviour
 
         // Drop tiles downward to show failure
         DropTilesDown();
+
+        // Play game fail sound
+        if (globalAudio != null)
+            globalAudio.PlayGameFail();
 
         // short delay to show fall
         yield return new WaitForSeconds(0.8f);

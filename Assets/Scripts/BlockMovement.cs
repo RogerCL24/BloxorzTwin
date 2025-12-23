@@ -15,6 +15,10 @@ public class BlockMovement : MonoBehaviour
     
     [Header("Debug")]
     public bool showDebug = false;
+
+    [Header("Physics Control")]
+    [Tooltip("If false, movement uses only calculated placement; collisions are ignored except when enabled for falls/game over.")]
+    public bool usePhysicsCollisions = false;
     
     Vector3 scale;
     // actual world-space size of the block (computed from colliders or renderers)
@@ -47,9 +51,75 @@ public class BlockMovement : MonoBehaviour
     
     private MapCreation mapCreation;
 
+    private LayerMask groundMask;
+
+    /// <summary>
+    /// Calcula las posiciones de cuadrícula ocupadas por el bloque según su orientación.
+    /// Retorna 1 posición si está de pie, 2 si está acostado.
+    /// </summary>
+    public Vector2Int[] GetOccupiedGridPositions()
+    {
+        Vector3 pos = transform.position;
+        
+        float upDot = Mathf.Abs(Vector3.Dot(transform.up, Vector3.up));
+        if (upDot > 0.9f)
+        {
+            // De pie: solo ocupa una casilla (la posición central)
+            int baseX = Mathf.RoundToInt(pos.x);
+            int baseZ = Mathf.RoundToInt(pos.z);
+            return new Vector2Int[] { new Vector2Int(baseX, baseZ) };
+        }
+        else
+        {
+            // Acostado: ocupa dos casillas. La posición está centrada entre ambas (en x.5 o z.5)
+            float rightUpDot = Mathf.Abs(Vector3.Dot(transform.right, Vector3.up));
+            float forwardUpDot = Mathf.Abs(Vector3.Dot(transform.forward, Vector3.up));
+
+            if (rightUpDot > 0.9f)
+            {
+                // Acostado a lo largo de X: ocupar dos casillas en X
+                // pos.x está en x.5, las dos casillas son floor(x) y ceil(x)
+                int x1 = Mathf.FloorToInt(pos.x);
+                int x2 = Mathf.CeilToInt(pos.x);
+                // Si pos.x es exactamente un entero (raro pero posible), ajustar
+                if (x1 == x2) { x1 = x2 - 1; }
+                int baseZ = Mathf.RoundToInt(pos.z);
+                return new Vector2Int[] { new Vector2Int(x1, baseZ), new Vector2Int(x2, baseZ) };
+            }
+            else if (forwardUpDot > 0.9f)
+            {
+                // Acostado a lo largo de Z: ocupar dos casillas en Z
+                // pos.z está en z.5, las dos casillas son floor(z) y ceil(z)
+                int baseX = Mathf.RoundToInt(pos.x);
+                int z1 = Mathf.FloorToInt(pos.z);
+                int z2 = Mathf.CeilToInt(pos.z);
+                // Si pos.z es exactamente un entero (raro pero posible), ajustar
+                if (z1 == z2) { z1 = z2 - 1; }
+                return new Vector2Int[] { new Vector2Int(baseX, z1), new Vector2Int(baseX, z2) };
+            }
+            else
+            {
+                // Fallback: solo una casilla
+                int baseX = Mathf.RoundToInt(pos.x);
+                int baseZ = Mathf.RoundToInt(pos.z);
+                return new Vector2Int[] { new Vector2Int(baseX, baseZ) };
+            }
+        }
+    }
+
+    /// <summary>
+    /// Verifica si el bloque está de pie (orientación vertical).
+    /// </summary>
+    public bool IsUpright()
+    {
+        float upDot = Mathf.Abs(Vector3.Dot(transform.up, Vector3.up));
+        return upDot > 0.9f;
+    }
+
     void Start()
     {
         mapCreation = FindFirstObjectByType<MapCreation>();
+        groundMask = Physics.DefaultRaycastLayers;
 
         // compute world-space size: prefer colliders on children, then renderers, else lossyScale
         scale = transform.lossyScale;
@@ -103,7 +173,9 @@ public class BlockMovement : MonoBehaviour
         Rigidbody rb = GetComponent<Rigidbody>();
         if (rb != null)
         {
-            rb.linearVelocity = new Vector3(0, -50, 0);
+            rb.linearVelocity = Vector3.zero;
+            rb.useGravity = false;
+            rb.isKinematic = true;
         }
         else
         {
@@ -155,16 +227,12 @@ public class BlockMovement : MonoBehaviour
         if (transform.position.y < -8f)
         {
             if (showDebug) Debug.Log("Block fell below threshold, triggering fail sequence");
-            if (mapCreation != null)
-            {
-                mapCreation.StartFailSequence();
-            }
-            else
-            {
-                ResetToStart();
-            }
+            TriggerFall();
             return; // skip input this frame
         }
+
+        // Deterministic grounding check (no physics collisions needed)
+        isGrounded = CheckGroundedByRaycast();
 
         if (!isRotating && isGrounded)
         {
@@ -206,17 +274,15 @@ public class BlockMovement : MonoBehaviour
                 rotationTime = 0;
                 isRotating = true;
                 
+                // Disable colliders during movement to prevent getting stuck on edges (e.g. disabled bridges)
+                Collider[] cols = GetComponentsInChildren<Collider>();
+                foreach (var c in cols) c.enabled = false;
+                
                 PlayMoveSound();
                 
                 if (showDebug)
                     Debug.Log("Starting move: direction=[" + directionX + ", " + directionZ + "]");
             }
-        }
-        else if (!isGrounded)
-        {
-            // Small position adjustment to keep physics active
-            this.transform.position += new Vector3(0, 0.1f, 0);
-            this.transform.position -= new Vector3(0, 0.1f, 0);
         }
     }
 
@@ -245,6 +311,13 @@ public class BlockMovement : MonoBehaviour
                 directionZ = 0;
                 rotationTime = 0;
                 
+                // Re-enable colliders after movement
+                Collider[] cols = GetComponentsInChildren<Collider>();
+                foreach (var c in cols) c.enabled = true;
+                
+                // Re-evaluate grounding deterministically
+                isGrounded = CheckGroundedByRaycast();
+
                 if (showDebug)
                     Debug.Log("Move complete. Position: " + transform.position);
             }
@@ -308,38 +381,35 @@ public class BlockMovement : MonoBehaviour
     }
 
     // Snap position and rotation to grid-aligned values and correct height based on orientation
-    private void SnapToGrid()
+    public void SnapToGrid()
     {
         Vector3 pos = transform.position;
+        // Tile top surface height
+        float groundHeight = 0.25f + (0.07f / 2f);
+
+        // Snap X/Z to half-units to avoid 0.5 drift (covers standing and lying)
+        pos.x = Mathf.Round(pos.x * 2f) / 2f;
+        pos.z = Mathf.Round(pos.z * 2f) / 2f;
+
         // Determine orientation by which local axis points up
         float upDot = Vector3.Dot(transform.up, Vector3.up);
         float rightUpDot = Mathf.Abs(Vector3.Dot(transform.right, Vector3.up));
         float forwardUpDot = Mathf.Abs(Vector3.Dot(transform.forward, Vector3.up));
 
-        // Tile center is at y=0.25, size.y is 0.07.
-        // Top surface is at center.y + size.y/2 = 0.25 + 0.035 = 0.285
-        float groundHeight = 0.25f + (0.07f / 2f);
+        float halfVertical = worldSize.y * 0.5f;
+        float halfThickness = Mathf.Min(worldSize.x, Mathf.Min(worldSize.y, worldSize.z)) * 0.5f; // block thickness when lying
 
         if (upDot > 0.9f)
         {
-            // Standing (vertical)
-            pos.x = Mathf.Round(pos.x);
-            pos.z = Mathf.Round(pos.z);
-            pos.y = worldSize.y / 2f + groundHeight;
+            pos.y = halfVertical + groundHeight;
         }
-        else if (rightUpDot > 0.9f)
+        else if (rightUpDot > 0.9f || forwardUpDot > 0.9f)
         {
-            // Lying along X (block spans two tiles on the X axis)
-            pos.x = Mathf.Round(pos.x * 2f) / 2f;
-            pos.z = Mathf.Round(pos.z);
-            pos.y = worldSize.x / 2f + groundHeight;
+            pos.y = halfThickness + groundHeight;
         }
-        else if (forwardUpDot > 0.9f)
+        else
         {
-            // Lying along Z
-            pos.x = Mathf.Round(pos.x);
-            pos.z = Mathf.Round(pos.z * 2f) / 2f;
-            pos.y = worldSize.z / 2f + groundHeight;
+            pos.y = halfVertical + groundHeight;
         }
 
         transform.position = pos;
@@ -354,81 +424,18 @@ public class BlockMovement : MonoBehaviour
         // Check for win condition
         float upDotCheck = Vector3.Dot(transform.up, Vector3.up);
         
-        // Check what we are standing on
-        RaycastHit hit;
-        if (Physics.Raycast(transform.position, Vector3.down, out hit, 2.0f))
-        {
-            if (showDebug) Debug.Log($"Raycast hit: {hit.collider.name} (Tag: {hit.collider.tag})");
-            
-            if (hit.collider.CompareTag("Finish"))
-            {
-                if (Mathf.Abs(upDotCheck) > 0.9f)
-                {
-                    if (mapCreation != null)
-                    {
-                        mapCreation.StartLevelCompleteSequence();
-                    }
-                }
-            }
-            else if (hit.collider.name == "BridgeButton")
-            {
-                if (showDebug) Debug.Log("Bridge Button Activated");
-                ButtonController btn = hit.collider.GetComponent<ButtonController>();
-                if (btn != null) btn.Activate();
-            }
-            else if (hit.collider.name == "CrossButton")
-            {
-                if (Mathf.Abs(upDotCheck) > 0.9f)
-                {
-                    // Un cubo dividido (split cube) no puede activar cross buttons
-                    SplitBlockController splitCtrl = GetComponent<SplitBlockController>();
-                    if (splitCtrl == null) // Solo el bloque completo puede activar cross buttons
-                    {
-                        if (showDebug) Debug.Log("Cross Button Activated");
-                        ButtonController btn = hit.collider.GetComponent<ButtonController>();
-                        if (btn != null) btn.Activate();
-                    }
-                    else if (showDebug)
-                    {
-                        Debug.Log("Split cube cannot activate Cross Button");
-                    }
-                }
-            }
-            else if (hit.collider.name == "DivisorButton")
-            {
-                if (Mathf.Abs(upDotCheck) > 0.9f)
-                {
-                    if (showDebug) Debug.Log("Divisor Button Activated");
-                    SplitBlockController splitCtrl = GetComponent<SplitBlockController>();
-                    if (splitCtrl != null && !splitCtrl.IsSplit)
-                    {
-                        // Obtener las posiciones de división desde DivisorButtonData
-                        DivisorButtonData divisorData = hit.collider.GetComponent<DivisorButtonData>();
-                        if (divisorData != null)
-                        {
-                            splitCtrl.Split(divisorData.splitPositionA, divisorData.splitPositionB);
-                            if (showDebug) Debug.Log($"Split at positions A={divisorData.splitPositionA} B={divisorData.splitPositionB}");
-                        }
-                        else
-                        {
-                            Debug.LogWarning("DivisorButton missing DivisorButtonData component");
-                        }
-                    }
-                }
-            }
-            else if (hit.collider.CompareTag("Orange"))
-            {
-                if (Mathf.Abs(upDotCheck) > 0.9f)
-                {
-                    StartCoroutine(BreakTile(hit.collider.gameObject));
-                }
-            }
-        }
+        // Usar sistema lógico de cuadrícula en lugar de física
+        Vector2Int[] occupied = GetOccupiedGridPositions();
+        bool isUpright = IsUpright();
+        GridManager.Instance?.CheckBlockPosition(occupied, isUpright);
+
+        // Mantener HandleFootContacts como respaldo/compatibilidad si es necesario
+        // HandleFootContacts(upDotCheck);
 
         if (showDebug) Debug.Log("Snapped to grid: " + transform.position + " rot=" + transform.eulerAngles);
     }
 
-    private IEnumerator BreakTile(GameObject tile)
+    public IEnumerator BreakTileLogic(GameObject tile)
     {
         if (showDebug) Debug.Log("Breaking tile...");
         
@@ -465,6 +472,7 @@ public class BlockMovement : MonoBehaviour
     // this method checks if the player hit the ground and enables the movement if it did
     void OnCollisionEnter(Collision theCollision)
     {
+        if (!usePhysicsCollisions) return;
         if (showDebug)
             Debug.Log("Collision Enter: " + theCollision.gameObject.name + " (Tag: " + theCollision.gameObject.tag + ")");
 
@@ -491,7 +499,7 @@ public class BlockMovement : MonoBehaviour
                 if (Vector3.Dot(cp.normal, Vector3.up) > 0.5f)
                 {
                     breakingTiles.Add(tile);
-                    StartCoroutine(BreakTile(tile));
+                    StartCoroutine(BreakTileLogic(tile));
                     break;
                 }
             }
@@ -500,6 +508,7 @@ public class BlockMovement : MonoBehaviour
 
     void OnCollisionStay(Collision theCollision)
     {
+        if (!usePhysicsCollisions) return;
         if (IsGroundCollision(theCollision))
         {
             groundColliders.Add(theCollision.collider);
@@ -510,6 +519,7 @@ public class BlockMovement : MonoBehaviour
 
     void OnCollisionExit(Collision theCollision)
     {
+        if (!usePhysicsCollisions) return;
         if (theCollision.gameObject.CompareTag("Tile") || theCollision.gameObject.CompareTag("Orange"))
         {
             groundColliders.Remove(theCollision.collider);
@@ -519,6 +529,7 @@ public class BlockMovement : MonoBehaviour
 
     void OnTriggerEnter(Collider other)
     {
+        if (!usePhysicsCollisions) return;
         if (other.gameObject.name == "BorderBlock")
         {
             if (showDebug) Debug.Log("Hit BorderBlock - Forcing Fall");
@@ -547,7 +558,23 @@ public class BlockMovement : MonoBehaviour
 
         return false;
     }
-    
+
+    private bool CheckGroundedByRaycast()
+    {
+        RaycastHit hit;
+        // Use a generous distance to cover lying orientations and map intro offsets
+        if (Physics.Raycast(transform.position, Vector3.down, out hit, 3f, groundMask, QueryTriggerInteraction.Collide))
+        {
+            string n = hit.collider.name;
+            if (hit.collider.CompareTag("Tile") || hit.collider.CompareTag("Orange") || hit.collider.CompareTag("Finish") || n.Contains("Button"))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+
     /// <summary>
     /// Plays a random movement sound from the array
     /// </summary>
@@ -587,6 +614,8 @@ public class BlockMovement : MonoBehaviour
             {
                 rb.linearVelocity = Vector3.zero;
                 rb.angularVelocity = Vector3.zero;
+                rb.useGravity = false;
+                rb.isKinematic = true;
             }
             
             // Reinitialize states
@@ -601,5 +630,22 @@ public class BlockMovement : MonoBehaviour
         }
         
         if (showDebug) Debug.Log("Reset/Reload level triggered");
+    }
+
+    private void TriggerFall()
+    {
+        if (mapCreation != null)
+        {
+            mapCreation.StartFailSequence();
+        }
+        else
+        {
+            Rigidbody rb = GetComponent<Rigidbody>();
+            if (rb != null)
+            {
+                rb.isKinematic = false;
+                rb.useGravity = true;
+            }
+        }
     }
 }

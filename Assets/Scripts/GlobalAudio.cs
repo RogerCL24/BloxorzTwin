@@ -9,6 +9,7 @@ public class GlobalAudio : MonoBehaviour
     public AudioClip[] moveClips;
     public AudioClip bridgeToggleClip;
     public AudioClip mapChangeClip;
+    public AudioClip gameFailClip;
 
     [Header("Levels")]
     [Range(0f, 1f)] public float sfxVolume = 1f;
@@ -52,6 +53,12 @@ public class GlobalAudio : MonoBehaviour
     {
         if (mapChangeClip == null) return;
         PlayOneShot(mapChangeClip);
+    }
+
+    public void PlayGameFail()
+    {
+        if (gameFailClip == null) return;
+        PlayOneShot(gameFailClip);
     }
 
     private void PlayOneShot(AudioClip clip)

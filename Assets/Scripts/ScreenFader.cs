@@ -27,6 +27,7 @@ public class ScreenFader : MonoBehaviour
             imgObj.transform.SetParent(cObj.transform, false);
             overlay = imgObj.AddComponent<Image>();
             overlay.color = new Color(0, 0, 0, 0);
+            overlay.raycastTarget = false; // Start transparent (no blocks clicks)
             RectTransform rt = overlay.rectTransform;
             rt.anchorMin = Vector2.zero;
             rt.anchorMax = Vector2.one;
@@ -50,8 +51,13 @@ public class ScreenFader : MonoBehaviour
             float t = Mathf.Clamp01(elapsed / duration);
             float a = Mathf.Lerp(startAlpha, targetAlpha, t);
             overlay.color = new Color(0, 0, 0, a);
+            
+            // Desactivar raycast cuando está completamente transparente
+            overlay.raycastTarget = a > 0.01f;
+            
             yield return null;
         }
         overlay.color = new Color(0, 0, 0, targetAlpha);
+        overlay.raycastTarget = targetAlpha > 0.01f;
     }
 }
