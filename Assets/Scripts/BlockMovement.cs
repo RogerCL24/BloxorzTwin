@@ -458,6 +458,9 @@ public class BlockMovement : MonoBehaviour
         {
             Destroy(tile);
         }
+
+        // Break surrounding breakable tiles in 3x3 area
+        BreakSurroundingTiles(tile);
         
         // Force fall
         isGrounded = false;
@@ -467,6 +470,37 @@ public class BlockMovement : MonoBehaviour
             rb.WakeUp();
         }
         breakingTiles.Remove(tile);
+    }
+
+    private void BreakSurroundingTiles(GameObject centerTile)
+    {
+        if (GridManager.Instance == null) return;
+
+        Vector2Int? centerPos = GridManager.Instance.GetTilePosition(centerTile);
+        if (centerPos == null) return;
+
+        Vector2Int center = centerPos.Value;
+
+        // Directions for 3x3 area (excluding center)
+        Vector2Int[] directions = {
+            new Vector2Int(-1, -1), new Vector2Int(0, -1), new Vector2Int(1, -1),
+            new Vector2Int(-1, 0),                       new Vector2Int(1, 0),
+            new Vector2Int(-1, 1),  new Vector2Int(0, 1),  new Vector2Int(1, 1)
+        };
+
+        foreach (Vector2Int dir in directions)
+        {
+            Vector2Int pos = center + dir;
+            if (GridManager.Instance.GetTileType(pos) == TileType.Orange)
+            {
+                TileData data = GridManager.Instance.GetTileData(pos);
+                if (data.gameObject != null && !breakingTiles.Contains(data.gameObject))
+                {
+                    breakingTiles.Add(data.gameObject);
+                    StartCoroutine(BreakTileLogic(data.gameObject));
+                }
+            }
+        }
     }
 
     // this method checks if the player hit the ground and enables the movement if it did
