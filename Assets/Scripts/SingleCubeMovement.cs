@@ -25,6 +25,11 @@ public class SingleCubeMovement : MonoBehaviour
     private float rotationRemaining = 0f;
     private float rotationDirection = 1f;
     private float rotationSpeedDeg = 300f;
+    
+    // Rastrear la dirección del movimiento y la posición inicial para calcular la nueva posición
+    private int currentMoveX = 0;
+    private int currentMoveZ = 0;
+    private Vector3 moveStartPosition;
 
     private bool isGrounded = false;
 
@@ -136,7 +141,7 @@ public class SingleCubeMovement : MonoBehaviour
         else if (Input.GetKeyDown(KeyCode.Alpha8)) mapCreation?.LoadLevel(8);
         else if (Input.GetKeyDown(KeyCode.Alpha9)) mapCreation?.LoadLevel(9);
 
-        // Auto-reset if fallen too far
+        // Auto-reset if fallen too far - SOLO check de limite inferior
         if (transform.position.y < -8f)
         {
             if (showDebug) Debug.Log("Single cube fell below threshold");
@@ -144,12 +149,12 @@ public class SingleCubeMovement : MonoBehaviour
             return;
         }
 
-        // Deterministic grounding check
-        isGrounded = CheckGroundedByRaycast();
-        if (!isGrounded)
+        // Deterministic grounding check - SOLO cuando no está rotando
+        if (!isRotating)
         {
-            TriggerFall();
-            return;
+            isGrounded = CheckGroundedByRaycast();
+            // NO llamar a TriggerFall aqui - permitir que el cubo caiga naturalmente
+            // Solo hacer gamefail cuando Y < -8 (controlado arriba)
         }
 
         float x = Input.GetAxisRaw("Horizontal");
@@ -195,41 +200,43 @@ public class SingleCubeMovement : MonoBehaviour
             return; // ignore diagonal inputs
         }
 
+        // Guardar la posición inicial ANTES de comenzar la rotación
+        moveStartPosition = transform.position;
+        
+        // Guardar la dirección del movimiento para usarla en CompleteMove
+        currentMoveX = moveX;
+        currentMoveZ = moveZ;
+
         rotationSpeedDeg = 90f / Mathf.Max(0.01f, duration);
         rotationRemaining = 90f;
         rotationDirection = 1f;
 
-        // Para un cubo 1x1x1, el punto de pivote está en la arista inferior
-        // hacia la dirección del movimiento.
-        // El centro del cubo está a 0.5 del suelo, y el pivote está en el suelo (y = groundHeight)
-        float groundHeight = 0.25f + (0.07f / 2f); // misma altura que en SnapToGrid
-        float pivotY = groundHeight; // el pivote está en el suelo, no en -0.5 relativo al centro
         Vector3 pos = transform.position;
-        float offsetFromCenter = 0.5f; // mitad del tamaño del cubo
+        float pivotY = pos.y; // pivote en la superficie del tile, no en la mitad del cubo
 
         if (moveX > 0)
         {
             rotationDirection = -1f;
             rotationAxis = Vector3.forward;
-            rotationPoint = new Vector3(pos.x + offsetFromCenter, pivotY, pos.z);
+            rotationPoint = new Vector3(pos.x + 0.5f, pivotY, pos.z);
         }
         else if (moveX < 0)
         {
             rotationDirection = 1f;
             rotationAxis = Vector3.forward;
-            rotationPoint = new Vector3(pos.x - offsetFromCenter, pivotY, pos.z);
+            rotationPoint = new Vector3(pos.x - 0.5f, pivotY, pos.z);
         }
         else if (moveZ > 0)
         {
             rotationDirection = 1f;
             rotationAxis = Vector3.right;
-            rotationPoint = new Vector3(pos.x, pivotY, pos.z + offsetFromCenter);
+            rotationPoint = new Vector3(pos.x, pivotY, pos.z + 0.5f);
         }
         else if (moveZ < 0)
         {
             rotationDirection = -1f;
             rotationAxis = Vector3.right;
-            rotationPoint = new Vector3(pos.x, pivotY, pos.z - offsetFromCenter);
+            rotationPoint = new Vector3(pos.x, pivotY, pos.z - 0.5f);
         }
         else
         {
@@ -239,8 +246,9 @@ public class SingleCubeMovement : MonoBehaviour
         isRotating = true;
         isFalling = false;
 
-        Collider[] cols = GetComponentsInChildren<Collider>();
-        foreach (var c in cols) c.enabled = false;
+        // No desactivar colliders durante la rotación - dejar que la física sea más robusta
+        // Collider[] cols = GetComponentsInChildren<Collider>();
+        // foreach (var c in cols) c.enabled = false;
 
         PlayMoveSound();
 
@@ -253,15 +261,28 @@ public class SingleCubeMovement : MonoBehaviour
         isRotating = false;
         rotationRemaining = 0f;
 
+        // Calcular la nueva posición correcta basándose en la posición INICIAL y el movimiento realizado
+        // El cubo se mueve 1 unidad en la dirección especificada
+        Vector3 newPos = moveStartPosition;
+        newPos.x = Mathf.Round(newPos.x + currentMoveX); // mover 1 unidad en X si es necesario
+        newPos.z = Mathf.Round(newPos.z + currentMoveZ); // mover 1 unidad en Z si es necesario
+        
+        // Establecer la nueva posición (manteniendo la Y que resultó de RotateAround)
+        transform.position = new Vector3(newPos.x, transform.position.y, newPos.z);
+        
+        // SnapToGrid SOLO ajustará Y - X/Z ya están correctos
         SnapToGrid();
-
-        Collider[] cols = GetComponentsInChildren<Collider>();
-        foreach (var c in cols) c.enabled = true;
+        
+        // Limpiar variables
+        currentMoveX = 0;
+        currentMoveZ = 0;
+        moveStartPosition = Vector3.zero;
 
         gridPosition = new Vector2Int(Mathf.RoundToInt(transform.position.x), Mathf.RoundToInt(transform.position.z));
         GridManager.Instance?.CheckSingleCubePosition(gridPosition);
 
-        isGrounded = CheckGroundedByRaycast();
+        // Después de SnapToGrid, el cubo debería estar definitivamente grounded
+        isGrounded = true; // forzar grounded después de snap
         isFalling = false;
 
         if (showDebug)
@@ -271,31 +292,25 @@ public class SingleCubeMovement : MonoBehaviour
     private void SnapToGrid()
     {
         Vector3 pos = transform.position;
-        // Tile top surface height
-        float groundHeight = 0.25f + (0.07f / 2f);
-
-        // Single cubes must always rest centered on a single tile
-        pos.x = Mathf.Round(pos.x);
-        pos.z = Mathf.Round(pos.z);
-
-        // Para un cubo 1x1x1, la altura siempre es 0.5 (mitad del cubo) + groundHeight
-        // independientemente de la orientación (porque es un cubo perfecto)
-        float halfCubeSize = 0.5f;
-        pos.y = halfCubeSize + groundHeight;
+        
+        // Calcular la altura correcta basándose en la orientación actual del cubo
+        float tileHeight = 0.25f; // altura del tile
+        float cubeHalfSize = 0.5f; // mitad del cubo
+        float targetY = tileHeight + cubeHalfSize; // superficie del tile + mitad del cubo
+        
+        // Evitar saltitos: interpolar suavemente hacia la altura correcta
+        // si no está ya cerca de ella
+        if (Mathf.Abs(pos.y - targetY) > 0.01f)
+        {
+            // Hacer una transición suave en lugar de un cambio abrupto
+            pos.y = targetY;
+        }
+        // Si ya está muy cerca, dejar como está para evitar jitter
 
         transform.position = pos;
 
-        // Snap rotation to nearest 90 degrees AND normalize to identity
-        // Un cubo 1x1x1 debería verse igual en cualquier rotación múltiplo de 90
-        // pero para evitar acumulación de errores, normalizar a identidad
-        transform.rotation = Quaternion.identity;
-        
-        // Alternativa: snap a 90 grados si quieres mantener la rotación visual
-        // Vector3 euler = transform.eulerAngles;
-        // euler.x = Mathf.Round(euler.x / 90f) * 90f;
-        // euler.y = Mathf.Round(euler.y / 90f) * 90f;
-        // euler.z = Mathf.Round(euler.z / 90f) * 90f;
-        // transform.eulerAngles = euler;
+        // NO resetear rotación - dejar que tenga la rotación que resultó de RotateAround()
+        // La rotación visual es parte de la animación y debe ser preservada
     }
 
     private bool CheckGroundedByRaycast()
@@ -317,6 +332,21 @@ public class SingleCubeMovement : MonoBehaviour
     {
         if (isFalling)
         {
+            return;
+        }
+
+        // NO activar fall si estamos rotando - el movimiento es válido
+        if (isRotating)
+        {
+            if (showDebug) Debug.Log("Ignoring fall trigger during rotation");
+            return;
+        }
+
+        // Solo activar gamefail si está REALMENTE muy bajo
+        if (transform.position.y >= -8f)
+        {
+            // El cubo está cayendo pero aún dentro del mapa - dejar que caiga
+            // No llamar a StartFailSequence aún
             return;
         }
 
